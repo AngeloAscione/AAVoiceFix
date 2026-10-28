@@ -10,7 +10,7 @@
     "test_command": "./gradlew :app:testDebugUnitTest",
     "test_root": "app/src/test",
     "source_root": "app/src/main",
-    "notes": "Stack Android installato da `company init`. ATTENZIONE: il progetto applicativo non esiste ancora (directory vuota, nessun gradlew): i comandi gradle falliranno finche' non viene creato lo scheletro Android. Il Tech Lead DEVE verificarli appena il wrapper esiste.",
+    "notes": "Comandi verificati: assembleDebug, lintDebug e testDebugUnitTest eseguiti con successo sul wrapper Gradle 9.8.2 / AGP 9.4.1 (emulatore API 35).",
     "instrumented_test_command": "./gradlew :app:connectedDebugAndroidTest",
     "instrumented_test_root": "app/src/androidTest",
     "instrumented_notes": "Test strumentati: richiedono un emulatore o un device collegato. Non sono il comando di verifica predefinito."

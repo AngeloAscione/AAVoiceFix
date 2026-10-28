@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AA Voice Fix</string>
+
+    <string name="accessibility_service_label">AA Voice Fix — intercettore vocale</string>
+    <string name="accessibility_service_description">Intercetta il tasto Riproduci dei messaggi vocali WhatsApp quando il telefono è proiettato su Android Auto, blocca il player nativo (che instrada l\'audio sul canale sbagliato) e riproduce lo stesso file .opus sul canale multimediale dell\'auto.</string>
+
+    <string name="intro">Ascolta le note vocali di WhatsApp dalle casse dell\'auto. Il servizio resta dormiente finché Android Auto non è connesso.\n\nStato:</string>
+
+    <string name="status_accessibility">Accessibilità: ?</string>
+    <string name="status_files">File: ?</string>
+    <string name="status_saf">Cartella SAF: ?</string>
+    <string name="status_auto">Android Auto: ?</string>
+    <string name="status_whatsapp">WhatsApp: ?</string>
+    <string name="status_audio">Player: ?</string>
+    <string name="status_last_event">Ultimo evento: —</string>
+
+    <string name="action_accessibility">Apri impostazioni accessibilità</string>
+    <string name="action_files">Concedi accesso completo ai file</string>
+    <string name="action_saf">Scegli cartella note vocali (SAF)</string>
+    <string name="action_clear_saf">Rimuovi cartella SAF</string>
+    <string name="action_test">Riproduci l\'ultimo vocale (test)</string>
+    <string name="action_refresh">Aggiorna stato</string>
+
+    <string name="adb_hint">Permessi da ADB (una volta sola):\n\nadb shell appops set dev.local.aawafixer MANAGE_EXTERNAL_STORAGE allow\nadb shell settings put secure accessibility_enabled 1\nadb shell settings put secure enabled_accessibility_services dev.local.aawafixer/dev.local.aawafixer.WaFixAccessibilityService\n\nDettagli in README.md.</string>
+
+    <string name="toast_no_voice_notes">Nessun file .opus trovato: concedi i permessi storage.</string>
+    <string name="toast_saf_saved">Cartella SAF salvata.</string>
+    <string name="toast_saf_failed">Impossibile salvare il permesso sulla cartella.</string>
+    <string name="toast_files_granted">Accesso completo ai file già concesso.</string>
+    <string name="toast_no_all_files_screen">Schermata non disponibile: usa il pulsante SAF.</string>
+</resources>

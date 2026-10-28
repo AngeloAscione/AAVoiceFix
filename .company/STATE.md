@@ -6,62 +6,89 @@
 
 ## Dove siamo
 
-Squadra AI Company installata sul repository. Il progetto applicativo Android
-**non esiste ancora**: la directory era vuota, ora contiene solo il protocollo
-(`.company/`, `.omp/`) e il `.gitignore`. Nessuna epica in corso, board vuota.
+v1.0 funzionante e verificata su emulatore: intercettazione del Play WhatsApp,
+pausa del player nativo, matching del file `.opus` e riproduzione su
+`USAGE_MEDIA`. Manca la prova sul campo con WhatsApp + Android Auto reali.
 
 ## Board
 
-Nessun ticket.
+Nessun ticket formale: il CEO ha fornito la specifica completa e il Tech Lead
+ha implementato direttamente (eccezione esplicita al flusso PM → Dev → QA).
 
 ## Cosa è stato consegnato
 
-- Protocollo AI Company — roster `company-pm`, `company-lead`, `company-dev`,
-  `company-qa`, `company-release`, prompt, board, script, CLI `company`.
-- Definizioni agenti generate in `.omp/agents/` (`company sync --check` → ok).
-- Configurazione OMP di progetto — `modelRoles.company_*`, concorrenza 3,
-  `approvalMode: yolo`.
+- Progetto Android Kotlin completo (Gradle wrapper 9.8.2, AGP 9.4.1,
+  compileSdk/targetSdk 37, minSdk 29).
+- `WaFixAccessibilityService` — intercettazione solo con Android Auto
+  connesso (`CarConnection`), parsing del fumetto, soppressione dei click
+  iniettati, toggle al secondo click.
+- `WhatsAppUiParser` — Play, durata e orario dai nodi di accessibilità;
+  esclusione dei video; riconoscimento per viewId WhatsApp
+  (`voice_note_playback_control`, `voice_note_seekbar`,
+  `voice_note_audio_duration`, `date`).
+- `OpusDuration` — durata dal granule Ogg, senza decodifica.
+- `VoiceNoteMatcher` — match per durata (tolleranza 1,5 s), orario del
+  messaggio e mtime; fallback all'ultimo `.opus`.
+- `VoiceNoteFinder` — scansione diretta (`MANAGE_EXTERNAL_STORAGE`) o SAF.
+- `VoiceNotePlayer` — Media3 ExoPlayer, `USAGE_MEDIA` +
+  `CONTENT_TYPE_SPEECH`, AudioFocus `TRANSIENT_MAY_DUCK`, rilascio a fine
+  traccia.
+- `MainActivity` — stato accessibilità/file/SAF/Android Auto/WhatsApp/player,
+  pulsanti di concessione, test dell'ultimo vocale, telemetria ultimo evento.
+- `scripts/adb-setup.sh` e README con i comandi ADB esatti.
 
 **Verifiche**
 
 | Prova | Esito |
 |---|---|
-| `python3 .company/scripts/test_protocol.py` | 142 passati, 0 falliti |
-| `company status` / `company board` | ok, board vuota |
-| `company sync --check` | agent definitions up to date |
-| `./gradlew ...` (build/lint/test) | non eseguibile: wrapper assente |
+| `./gradlew :app:testDebugUnitTest` | 17 test, 0 falliti |
+| `./gradlew :app:assembleDebug :app:lintDebug` | build + lint ok |
+| Install su emulatore API 35 via ADB | ok, UI renderizzata |
+| `appops MANAGE_EXTERNAL_STORAGE` + service abilitato via ADB | ok |
+| Riproduzione reale di un `.opus` 24,5 s | ok: "vocale terminato", focus/player rilasciati |
+| Parser su struttura viewId WhatsApp reale | coperto da unit test |
+| WhatsApp + Android Auto reali | **non ancora provato** (nessun device/auto disponibile) |
 
 ## Difetti noti
 
-Nessuno noto nel protocollo. Vincolo di setup: `project.*_command` puntano al
-wrapper Gradle, che non è ancora presente.
+Nessuno noto nel codice. Due rischi di campo:
+
+1. WhatsApp può cambiare layout/label: il parser è euristico e va calibrato
+   con `adb logcat -s AAWaFixer` + `uiautomator dump`.
+2. La pausa nativa è un click iniettato a 350 ms: su device lenti può arrivare
+   in ritardo. Il log dice se il click è riuscito.
 
 ## Decisioni aperte (spettano al CEO)
 
 | ID | Decisione | Stato |
 |---|---|---|
-| D1 | Requisiti e scope di AndroidAutoWaFixer (prima idea per il PM) | aperta |
-| D2 | Scaffold Android: package name, minSdk/targetSdk, modulo unico o multi-modulo | aperta |
+| D1 | Prova su device reale con WhatsApp + Android Auto e raccolta log | aperta |
+| D2 | Eventuale distribuzione (firma release, R8) | aperta |
 
 ## Ambiente: le trappole
 
-- Il repository è stato inizializzato con `git init -b main`: il branch base è
-  `main` (vedi `policy.base_branch` in `.company/manifest.json`).
-- `company init --detect .` fallisce finché non esiste un file di stack
-  (`gradlew` + `app/build.gradle.kts`): è il motivo per cui lo stack `android`
-  è stato impostato a mano. Rilancialo dopo lo scaffold e confronta i comandi.
-- I comandi `./gradlew :app:*` falliscono senza wrapper: non sono verificati.
-- `.company/board/*` e `.company/worktrees/*` sono runtime e ignored (i
-  `.gitkeep` restano tracciati).
-- Gli agenti sono headless: `tools.approvalMode: yolo` in `.omp/config.yml`
-  è obbligatorio, altrimenti `bash` resta bloccato e il ciclo Dev↔QA non gira.
+- AGP 9 include Kotlin built-in: **non** applicare `org.jetbrains.kotlin.android`
+  (il plugin viene rifiutato).
+- Comandi verificati: manifest `project.*_command` allineati a
+  `company init . --detect` (stack android).
+- Gradle 9.8.2 richiede JDK 17+; il default della macchina è JDK 21.
+- `adb shell settings put secure enabled_accessibility_services` va eseguito
+  preservando i servizi esistenti: usare `scripts/adb-setup.sh`.
+- L'emulatore API 35 non ha Android Auto: `CarConnection` resta
+  `CONNECTION_TYPE_NOT_CONNECTED`, quindi il percorso di intercettazione non è
+  testabile lì.
 
 ## Prossimo passo
 
-Il CEO fornisce la prima idea; il Tech Lead la passa a `company-pm` per PRD,
-epiche e ticket in `.company/board/tickets/`; poi il primo ticket crea lo
-scheletro Android (wrapper Gradle incluso) così i comandi del manifest
-diventano eseguibili e verificabili.
+Installare su un telefono reale con `scripts/adb-setup.sh`, collegare Android
+Auto, aprire una chat con un vocale e verificare:
+
+```bash
+adb logcat -s AAWaFixer
+```
+
+Attesi: `vocale durata=… ora=…`, `pausa del player nativo inviata`,
+`match PTT-…`, `riproduco …`, `vocale terminato`.
 
 ## Come riprendere in una sessione nuova
 

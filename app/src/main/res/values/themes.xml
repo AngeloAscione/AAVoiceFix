@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AAWaFixer" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">#FF128C7E</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#FFF7F7F7</item>
+        <item name="android:navigationBarColor">#FFF7F7F7</item>
+    </style>
+</resources>

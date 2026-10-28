@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/intro"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/status_accessibility"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/status_accessibility"
+            android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/btn_accessibility"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/action_accessibility" />
+
+        <TextView
+            android:id="@+id/status_files"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/status_files"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/status_saf"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/status_saf"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btn_files"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/action_files" />
+
+        <Button
+            android:id="@+id/btn_saf"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/action_saf" />
+
+        <Button
+            android:id="@+id/btn_clear_saf"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/action_clear_saf" />
+
+        <TextView
+            android:id="@+id/status_auto"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/status_auto"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/status_whatsapp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/status_whatsapp"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/status_audio"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/status_audio"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/status_last_event"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/status_last_event"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btn_test"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/action_test" />
+
+        <Button
+            android:id="@+id/btn_refresh"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/action_refresh" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/adb_hint"
+            android:textSize="12sp"
+            android:typeface="monospace" />
+    </LinearLayout>
+</ScrollView>

@@ -47,7 +47,9 @@ ha implementato direttamente (eccezione esplicita al flusso PM → Dev → QA).
 | `appops MANAGE_EXTERNAL_STORAGE` + service abilitato via ADB | ok |
 | Riproduzione reale di un `.opus` 24,5 s | ok: "vocale terminato", focus/player rilasciati |
 | Parser su struttura viewId WhatsApp reale | coperto da unit test |
-| WhatsApp + Android Auto reali | **non ancora provato** (nessun device/auto disponibile) |
+| Pixel 8 (Android 17) via ADB: install, appops, service | ok, servizio ATTIVO |
+| Scansione reale + playback su Pixel 8 | ok: `202644/PTT-20261028-WA0028.opus`, <1 s |
+| WhatsApp + Android Auto reali | **non ancora provato** (nessuna auto connessa) |
 
 ## Difetti noti
 

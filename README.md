@@ -70,7 +70,10 @@ unità nativa: nessun polling, nessun servizio in background aggiuntivo.
 ## Matching del file `.opus`
 
 Directory: `Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Voice Notes/`
-(più `Sent/`), ricorsione fino a 3 livelli, ultimi 200 file per mtime.
+(più `Sent/`). WhatsApp organizza i PTT in cartelle settimanali numeriche
+(`202644`): si visitano prima le più recenti, fino a 40 cartelle e 200 file,
+ordinati per mtime. La scansione completa delle ~286 cartelle sarebbe troppo
+lenta per un'intercettazione.
 
 1. Durata reale letta dal **granule position** dell'ultima pagina Ogg
    (`granule / 48000`), senza decodifica.
@@ -143,6 +146,11 @@ adb uninstall dev.local.aawafixer
 ```
 
 Riavvia l'app (o il telefono) dopo aver cambiato `enabled_accessibility_services`.
+
+**Non usare `adb shell am force-stop dev.local.aawafixer`**: su Android 13+
+il force-stop disabilita il servizio di accessibilità del pacchetto e azzera
+`enabled_accessibility_services`. Per fermare l'app usa il pannello delle app
+recenti o rilancia `scripts/adb-setup.sh` dopo il force-stop.
 
 ## Uso
 

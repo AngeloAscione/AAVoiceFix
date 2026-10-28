@@ -44,15 +44,18 @@ class VoiceNoteFinder(private val context: Context) {
 
     private fun scanDirect(): List<VoiceNoteFile>? {
         if (!AppConfig.hasDirectFileAccess(context)) return null
-        val found = mutableListOf<File>()
         val roots = AppConfig.directVoiceDirs()
         if (roots.isEmpty()) {
             Log.w(AppConfig.TAG, "directory WhatsApp Voice Notes non trovata")
             return emptyList()
         }
-        roots.forEach { walkFile(it, 0, found) }
+        val found = mutableListOf<File>()
+        for (root in roots) {
+            collectDirect(root, found)
+            if (found.size >= MAX_FILES) break
+        }
         return found
-            .asSequence()
+            .distinctBy { it.absolutePath }
             .sortedByDescending { it.lastModified() }
             .take(MAX_FILES)
             .map { file ->
@@ -63,28 +66,53 @@ class VoiceNoteFinder(private val context: Context) {
                     durationMs = OpusDuration.fromFile(file),
                 )
             }
-            .toList()
     }
 
-    private fun walkFile(dir: File, depth: Int, out: MutableList<File>) {
-        if (depth > MAX_DEPTH) return
+    /**
+     * WhatsApp organizza i PTT in sottocartelle settimanali (`202643`, ...).
+     * Si visitano prima le piu' recenti (nome numerico decrescente) e ci si
+     * ferma appena raccolti abbastanza file: 286 cartelle scansionate per
+     * intero renderebbero l'intercettazione lenta.
+     */
+    private fun collectDirect(dir: File, out: MutableList<File>) {
         val children = dir.listFiles() ?: return
         for (child in children) {
-            if (child.isDirectory) {
-                walkFile(child, depth + 1, out)
-            } else if (child.name.endsWith(".opus", ignoreCase = true)) {
-                out += child
+            if (child.isFile && child.name.endsWith(".opus", ignoreCase = true)) out += child
+        }
+        val subdirs = children
+            .filter { it.isDirectory }
+            .sortedWith(
+                compareByDescending<File> { weekFolderKey(it.name) }
+                    .thenByDescending { it.lastModified() },
+            )
+            .take(MAX_FOLDERS)
+
+        for (subdir in subdirs) {
+            if (out.size >= MAX_FILES) return
+            val subChildren = subdir.listFiles() ?: continue
+            for (child in subChildren) {
+                if (child.isFile && child.name.endsWith(".opus", ignoreCase = true)) out += child
+            }
+            // Alcune versioni annidano un ulteriore livello.
+            for (nested in subChildren.filter { it.isDirectory }) {
+                if (out.size >= MAX_FILES) return
+                nested.listFiles()?.forEach { file ->
+                    if (file.isFile && file.name.endsWith(".opus", ignoreCase = true)) out += file
+                }
             }
         }
     }
+
+    /** `202643` -> 202643, cosi' l'ordine decrescente e' il piu' recente. */
+    private fun weekFolderKey(name: String): Int = name.toIntOrNull() ?: -1
 
     private fun scanSaf(): List<VoiceNoteFile> {
         val tree = AppConfig.safTreeUri(context) ?: return emptyList()
         val root = DocumentFile.fromTreeUri(context, tree) ?: return emptyList()
         val found = mutableListOf<DocumentFile>()
-        walkSaf(root, 0, found)
+        collectSaf(root, found)
         return found
-            .asSequence()
+            .distinctBy { it.uri.toString() }
             .sortedByDescending { it.lastModified() }
             .take(MAX_FILES)
             .map { doc ->
@@ -95,22 +123,35 @@ class VoiceNoteFinder(private val context: Context) {
                     durationMs = OpusDuration.fromUri(context, doc.uri),
                 )
             }
-            .toList()
     }
 
-    private fun walkSaf(dir: DocumentFile, depth: Int, out: MutableList<DocumentFile>) {
-        if (depth > MAX_DEPTH) return
-        for (child in dir.listFiles()) {
-            if (child.isDirectory) {
-                walkSaf(child, depth + 1, out)
-            } else if (child.isFile && child.name?.endsWith(".opus", ignoreCase = true) == true) {
+    private fun collectSaf(dir: DocumentFile, out: MutableList<DocumentFile>) {
+        val children = dir.listFiles()
+        for (child in children) {
+            if (child.isFile && child.name?.endsWith(".opus", ignoreCase = true) == true) {
                 out += child
+            }
+        }
+        val subdirs = children
+            .filter { it.isDirectory }
+            .sortedWith(
+                compareByDescending<DocumentFile> { weekFolderKey(it.name.orEmpty()) }
+                    .thenByDescending { it.lastModified() },
+            )
+            .take(MAX_FOLDERS)
+
+        for (subdir in subdirs) {
+            if (out.size >= MAX_FILES) return
+            for (child in subdir.listFiles()) {
+                if (child.isFile && child.name?.endsWith(".opus", ignoreCase = true) == true) {
+                    out += child
+                }
             }
         }
     }
 
     companion object {
         const val MAX_FILES = 200
-        const val MAX_DEPTH = 3
+        const val MAX_FOLDERS = 40
     }
 }

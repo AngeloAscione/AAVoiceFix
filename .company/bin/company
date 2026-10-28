@@ -1,0 +1,383 @@
+#!/usr/bin/env python3
+"""company — CLI operativa della AI Company.
+
+Un solo punto d'ingresso per il Tech Lead e per gli script automatici:
+board, pack, handoff, verify, gate, spawn, sync, worktree.
+
+Uso:
+    company brief                      # STATE.md + board + handoff: per riprendere
+    company board [--status S] [--json] [--next]
+    company pack <TICKET> <ruolo|all>
+    company handoff <TICKET> <kind>
+    company verify <TICKET> <kind>
+    company gate <TICKET>
+    company move <TICKET> <STATO> --actor <ruolo> [--note "..."]
+    company escalate <TICKET> <TICKET>...
+    company spawn <ruolo> <TICKET> [--json]
+    company sync [--check]
+    company worktree create|list|remove <TICKET>
+    company init <path> [--dry-run] [--force]
+    company status
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SCRIPTS = REPO_ROOT / ".company" / "scripts"
+PACKS_DIR = REPO_ROOT / ".company" / "board" / "packs"
+TICKETS_DIR = REPO_ROOT / ".company" / "board" / "tickets"
+WORKTREES_DIR = REPO_ROOT / ".company" / "worktrees"
+LOGS_DIR = REPO_ROOT / ".company" / "logs"
+
+sys.path.insert(0, str(SCRIPTS))
+import board  # noqa: E402
+import guard  # noqa: E402
+import pack as pack_mod  # noqa: E402
+
+
+def run_script(script: str, *args: str) -> int:
+    return subprocess.run(
+        [sys.executable, str(SCRIPTS / script), *args], cwd=REPO_ROOT, check=False
+    ).returncode
+
+
+def cmd_board(args: argparse.Namespace) -> int:
+    if args.next:
+        return run_script("board.py", "next", "--limit", str(args.limit))
+    argv = ["list"]
+    if args.status:
+        argv += ["--status", args.status]
+    if args.json:
+        argv.append("--json")
+    return run_script("board.py", *argv)
+
+
+def cmd_pack(args: argparse.Namespace) -> int:
+    return run_script("pack.py", args.ticket, args.role)
+
+
+def cmd_handoff(args: argparse.Namespace) -> int:
+    return run_script("guard.py", "handoff", args.ticket, args.kind)
+
+
+def cmd_verify(args: argparse.Namespace) -> int:
+    return run_script("guard.py", "check", args.ticket, args.kind)
+
+
+def cmd_gate(args: argparse.Namespace) -> int:
+    return run_script("guard.py", "gate", args.ticket)
+
+
+def cmd_move(args: argparse.Namespace) -> int:
+    argv = ["move", args.ticket, args.to, "--actor", args.actor]
+    if args.note:
+        argv += ["--note", args.note]
+    return run_script("board.py", *argv)
+
+
+def cmd_escalate(args: argparse.Namespace) -> int:
+    rc = 0
+    for ticket in args.tickets:
+        rc |= run_script("guard.py", "escalate", ticket)
+    return rc
+
+
+def cmd_sync(args: argparse.Namespace) -> int:
+    argv = ["--check"] if args.check else []
+    return run_script("sync_agents.py", *argv)
+
+
+def cmd_worktree(args: argparse.Namespace) -> int:
+    import worktree
+
+    if args.action == "create":
+        return worktree.create(args.ticket)
+    if args.action == "list":
+        return worktree.list_all()
+    if args.action == "remove":
+        return worktree.remove(args.ticket)
+    return 2
+
+
+def cmd_spawn(args: argparse.Namespace) -> int:
+    """Lancia un agente con il context pack come unico input.
+
+    Usa `omp task` in batch shape (JSON su stdin). L'agente riceve il pack
+    come prompt e i suoi output/handoff su disco. Se il ticket ha un
+    worktree, l'agente ci lavora dentro.
+    """
+    manifest = json.loads((REPO_ROOT / ".company" / "manifest.json").read_text(encoding="utf-8"))
+    known = {a["name"] for a in manifest["agents"]}
+    if args.role not in known:
+        print(f"ERRORE: ruolo sconosciuto '{args.role}'. Conosciuti: {sorted(known)}", file=sys.stderr)
+        return 2
+
+    ticket = board.load_ticket(args.ticket)
+    pack_path = PACKS_DIR / f"{args.ticket}-{args.role}.md"
+    if not pack_path.exists():
+        rc = run_script("pack.py", args.ticket, args.role)
+        if rc != 0:
+            return rc
+    pack_text = pack_path.read_text(encoding="utf-8")
+
+    workdir = REPO_ROOT
+    if WORKTREES_DIR.exists():
+        candidates = sorted(WORKTREES_DIR.glob(f"{args.ticket}-*"))
+        if candidates:
+            workdir = candidates[0]
+
+    task_text = (
+        f"{pack_text}\n\n"
+        f"---\n\n"
+        f"Agente: {args.role} (manifest: .company/manifest.json)\n"
+        f"Ticket: {args.ticket} — {ticket.get('title')}\n"
+        f"Branch: {ticket.get('branch') or '(da assegnare)'}\n"
+        f"Directory di lavoro: {workdir}\n"
+        f"Spec: {ticket.get('spec') or '-'}\n\n"
+        "Esegui il tuo compito come definito dal tuo System Prompt. "
+        "Il tuo output DEVE essere scritto su disco come handoff nella directory indicata "
+        "dal protocollo, non solo nella tua risposta. "
+        "Non modificare file fuori dallo scope autorizzato. "
+        "Non far domande: se un requisito è ambiguo, segnalalo nell'handoff."
+    )
+
+    payload = {
+        "context": f"AI Company — squadra multi-agente. Progetto: {REPO_ROOT.name}.",
+        "tasks": [
+            {
+                "agent": args.role,
+                "name": f"{args.ticket}-{args.role}",
+                "task": task_text,
+                "solutionSpace": "one fix: scope, design e acceptance criteria sono dati nel pack",
+            }
+        ],
+    }
+
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = LOGS_DIR / f"{args.ticket}-{args.role}.json"
+    proc = subprocess.run(
+        ["omp", "task"],
+        cwd=workdir,
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    log_path.write_text(
+        json.dumps(
+            {
+                "ticket": args.ticket,
+                "role": args.role,
+                "exit_code": proc.returncode,
+                "stdout": proc.stdout,
+                "stderr": proc.stderr,
+            },
+            indent=2,
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    sys.stdout.write(proc.stdout)
+    sys.stderr.write(proc.stderr)
+    print(f"log: {log_path.relative_to(REPO_ROOT)}")
+    return proc.returncode
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    """Installa la squadra in un altro repository.
+
+    Deve girare con la cwd dell'utente, non con REPO_ROOT: `company init .`
+    documentato in PORTING.md risolve il path rispetto alla directory da cui
+    viene invocato il comando.
+    """
+    return subprocess.run(
+        [sys.executable, str(SCRIPTS / "init.py"), *args.rest], check=False
+    ).returncode
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    manifest = json.loads((REPO_ROOT / ".company" / "manifest.json").read_text(encoding="utf-8"))
+    tickets = board.all_tickets()
+    counts: dict[str, int] = {}
+    for t in tickets:
+        counts[t.get("status", "?")] = counts.get(t.get("status", "?"), 0) + 1
+    print("AI Company — stato")
+    print(f"  ticket totali: {len(tickets)}")
+    for state in board.STATES:
+        if counts.get(state):
+            print(f"  {state:<24} {counts[state]}")
+    blocked = [t for t in tickets if t.get("status") == board.BLOCKED_WAITING_HUMAN]
+    if blocked:
+        print("\n  in attesa del CEO:")
+        for t in blocked:
+            print(f"    {t['id']} — {t.get('title')}")
+    stale = run_script("sync_agents.py", "--check")
+    print(f"\n  agent definitions: {'outdated' if stale == 1 else 'ok'}")
+    return 0
+
+
+def cmd_brief(args: argparse.Namespace) -> int:
+    """Tutto il necessario per riprendere: stato, board, handoff, STATE.md.
+
+    Pensato per la prima azione di una sessione nuova, aperta nella cartella
+    del progetto: sostituisce la memoria della conversazione precedente.
+    """
+    manifest = json.loads(
+        (REPO_ROOT / ".company" / "manifest.json").read_text(encoding="utf-8")
+    )
+    project = manifest.get("project") or {}
+    tickets = board.all_tickets()
+
+    print("=" * 72)
+    print(f"  {project.get('name') or REPO_ROOT.name}")
+    print(f"  stack: {project.get('stack')}   branch base: {manifest['policy'].get('base_branch')}")
+    print("=" * 72)
+
+    # Stato corrente: il documento narrativo, se c'e'.
+    state_path = REPO_ROOT / ".company" / "STATE.md"
+    if state_path.exists() and not args.no_state:
+        print()
+        print(state_path.read_text(encoding="utf-8").rstrip())
+
+    # Board: dati vivi, non narrativa.
+    print()
+    print("-" * 72)
+    print("  BOARD (dati correnti)")
+    print("-" * 72)
+    if not tickets:
+        print("  vuota")
+    else:
+        order = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+        for t in sorted(
+            tickets,
+            key=lambda x: (x.get("status") == "DONE", order.get(x.get("priority", "P3"), 9), x.get("id", "")),
+        ):
+            assignee = t.get("assignee") or "-"
+            print(
+                f"  {t.get('id'):<9} {t.get('status'):<12} {t.get('priority'):<3} "
+                f"{assignee:<14} {t.get('title', '')[:60]}"
+            )
+
+    # Handoff recenti: cosa si sono detti gli agenti.
+    handoffs_dir = REPO_ROOT / ".company" / "board" / "handoffs"
+    recent = (
+        sorted(handoffs_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:5]
+        if handoffs_dir.exists()
+        else []
+    )
+    if recent:
+        print()
+        print("-" * 72)
+        print("  ULTIMI HANDOFF")
+        print("-" * 72)
+        for path in recent:
+            print(f"  {path.name}")
+
+    # Escalation in attesa del CEO.
+    escalations = sorted((REPO_ROOT / ".company" / "escalations").glob("ESC-*.md"))
+    if escalations:
+        print()
+        print("-" * 72)
+        print("  IN ATTESA DEL CEO")
+        print("-" * 72)
+        for path in escalations[-3:]:
+            print(f"  {path.name}")
+
+    stale = run_script("sync_agents.py", "--check")
+    print()
+    print(f"  agent definitions: {'OUTDATED — esegui `company sync`' if stale == 1 else 'ok'}")
+    print()
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="company", description="CLI operativa della AI Company"
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_board = sub.add_parser("board", help="mostra lo stato della board")
+    p_board.add_argument("--status")
+    p_board.add_argument("--json", action="store_true")
+    p_board.add_argument("--next", action="store_true")
+    p_board.add_argument("--limit", type=int, default=5)
+    p_board.set_defaults(func=cmd_board)
+
+    p_pack = sub.add_parser("pack", help="genera il context pack per un ruolo")
+    p_pack.add_argument("ticket")
+    p_pack.add_argument("role", choices=["company-pm", "company-lead", "company-dev", "company-qa", "company-release", "all"])
+    p_pack.set_defaults(func=cmd_pack)
+
+    p_handoff = sub.add_parser("handoff", help="crea lo scheletro di un handoff")
+    p_handoff.add_argument("ticket")
+    p_handoff.add_argument("kind")
+    p_handoff.set_defaults(func=cmd_handoff)
+
+    p_verify = sub.add_parser("verify", help="valida un handoff")
+    p_verify.add_argument("ticket")
+    p_verify.add_argument("kind")
+    p_verify.set_defaults(func=cmd_verify)
+
+    p_gate = sub.add_parser("gate", help="applica le regole di uscita del ticket")
+    p_gate.add_argument("ticket")
+    p_gate.set_defaults(func=cmd_gate)
+
+    p_move = sub.add_parser("move", help="muove un ticket nella macchina a stati")
+    p_move.add_argument("ticket")
+    p_move.add_argument("to")
+    p_move.add_argument("--actor", required=True)
+    p_move.add_argument("--note", default="")
+    p_move.set_defaults(func=cmd_move)
+
+    p_esc = sub.add_parser("escalate", help="valida gli escalation report")
+    p_esc.add_argument("tickets", nargs="+")
+    p_esc.set_defaults(func=cmd_escalate)
+
+    p_sync = sub.add_parser("sync", help="rigenera le definizioni degli agenti")
+    p_sync.add_argument("--check", action="store_true")
+    p_sync.set_defaults(func=cmd_sync)
+
+    p_wt = sub.add_parser("worktree", help="gestione dei worktree isolati")
+    p_wt.add_argument("action", choices=["create", "list", "remove"])
+    p_wt.add_argument("ticket")
+    p_wt.set_defaults(func=cmd_worktree)
+
+    p_spawn = sub.add_parser("spawn", help="lancia un agente con il suo context pack")
+    p_spawn.add_argument("role")
+    p_spawn.add_argument("ticket")
+    p_spawn.set_defaults(func=cmd_spawn)
+
+    p_init = sub.add_parser(
+        "init", help="installa la squadra in un altro repository"
+    )
+    p_init.add_argument("rest", nargs=argparse.REMAINDER)
+    p_init.set_defaults(func=cmd_init)
+
+    p_status = sub.add_parser("status", help="riassunto dello stato")
+    p_status.set_defaults(func=cmd_status)
+
+    p_brief = sub.add_parser(
+        "brief", help="tutto per riprendere: STATE.md, board, handoff"
+    )
+    p_brief.add_argument(
+        "--no-state", action="store_true", help="solo board e handoff, senza STATE.md"
+    )
+    p_brief.set_defaults(func=cmd_brief)
+
+    args = parser.parse_args(argv)
+    try:
+        return args.func(args)
+    except (board.BoardError, guard.GuardError, pack_mod.PackError) as exc:
+        print(f"ERRORE: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

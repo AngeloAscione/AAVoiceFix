@@ -1,0 +1,27 @@
+{
+  "ticket": "TKT-NNN",
+  "from": "company-dev",
+  "to": "company-qa",
+  "kind": "dev->qa",
+  "created_at": "<ISO-8601>",
+  "branch": "feature/TKT-NNN-<slug>",
+  "commits": ["<sha>"],
+  "summary": "<2-3 righe: cosa è stato implementato>",
+  "changed_files": [
+    "src/<path>",
+    "tests/<path>"
+  ],
+  "artifacts": {
+    "build": "ok | failed",
+    "build_command": "<cmd>",
+    "lint": "ok | failed",
+    "lint_command": "<cmd>",
+    "tests_local": "<N passed, M failed>",
+    "tests_command": "<cmd>",
+    "pr_url": "<url | null>"
+  },
+  "questions": [
+    "<domanda aperta per il QA, se esiste>"
+  ],
+  "next_action": "qa: eseguire la suite e verificare gli AC del ticket"
+}

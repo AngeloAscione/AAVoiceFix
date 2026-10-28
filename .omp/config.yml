@@ -1,0 +1,54 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AI Company — configurazione di progetto OMP
+#
+# Questo file è il livello "project" delle settings OMP. Prevalenza:
+#   runtime flags > --config overlay > .omp/config.yml > ~/.omp/agent/config.yml
+#
+# VINCOLO DI MODELLO: tutti i ruoli della squadra usano
+# `openrouter/deepseek/deepseek-v4.1-flash-1017`.
+#
+# Il modello supporta i thinking level `low`, `high`, `max`: `medium` non
+# esiste e verrebbe clampato in modo silenzioso. Per questo i thinking level
+# degli agenti sono `high` (pm, lead, dev, qa) e `low` (release), definiti nel
+# manifest e non qui.
+#
+# Per cambiare modello si modifica QUESTO file e `.company/manifest.json`,
+# poi si esegue `company sync`: le definizioni in .omp/agents/ sono generate.
+# ─────────────────────────────────────────────────────────────────────────────
+
+modelRoles:
+  # Un solo modello per tutta la squadra: lo schema del ruolo (prompt, tool,
+  # thinking level) porta la differenza di comportamento, non il modello.
+  company_pm: openrouter/deepseek/deepseek-v4.1-flash-1017
+  company_lead: openrouter/deepseek/deepseek-v4.1-flash-1017
+  company_dev: openrouter/deepseek/deepseek-v4.1-flash-1017
+  company_qa: openrouter/deepseek/deepseek-v4.1-flash-1017
+  company_release: openrouter/deepseek/deepseek-v4.1-flash-1017
+
+task:
+  # Quanti sub-agent possono girare in parallelo. Tre e' un limite scelto per
+  # controllo di costo e rate limit, non imposto dal provider: con un solo
+  # ticket in lavorazione raramente servono piu' di 2 agenti insieme.
+  maxConcurrency: 3
+  # L'isolamento (worktree/clon) e' gestito dai nostri script in
+  # .company/scripts/worktree.py, non dal meccanismo nativo OMP: i branch
+  # devono avere il naming `feature/<TICKET>-<slug>` che il guard verifica.
+  isolation:
+    enabled: false
+  # LSP utile a Dev e QA (diagnostica e definizioni reali, non stime).
+  enableLsp: true
+  # Budget morbido per singolo sub-agent: 200 richieste e' il default globale,
+  # qui si alza solo per i ruoli che scrivono artefatti lunghi.
+  agentSoftRequestBudget:
+    company-pm: 120
+    company-dev: 200
+    company-qa: 200
+    company-lead: 300
+
+# Gli agenti della squadra sono headless: non hanno UI per approvare una
+# richiesta di tool `exec`. Con `approvalMode: write` il tool `bash` resta
+# bloccato e gli agenti non possono eseguire build, test o git — il ciclo
+# Dev<->QA non gira. In yolo, l'unico confine di autorizzazione e' il task
+# tool: chi puo' spawnare un agente puo' eseguire i suoi comandi.
+tools:
+  approvalMode: yolo

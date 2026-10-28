@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "company": "AI Company",
+  "description": "Roster degli agenti della squadra. Fonte unica: .company/prompts/*.md + questo manifest. Generato in .omp/agents/ da scripts/sync_agents.py.",
+  "project": {
+    "name": "AndroidAutoWaFixer",
+    "stack": "android",
+    "build_command": "./gradlew :app:assembleDebug",
+    "lint_command": "./gradlew :app:lintDebug",
+    "test_command": "./gradlew :app:testDebugUnitTest",
+    "test_root": "app/src/test",
+    "source_root": "app/src/main",
+    "notes": "Stack Android installato da `company init`. ATTENZIONE: il progetto applicativo non esiste ancora (directory vuota, nessun gradlew): i comandi gradle falliranno finche' non viene creato lo scheletro Android. Il Tech Lead DEVE verificarli appena il wrapper esiste.",
+    "instrumented_test_command": "./gradlew :app:connectedDebugAndroidTest",
+    "instrumented_test_root": "app/src/androidTest",
+    "instrumented_notes": "Test strumentati: richiedono un emulatore o un device collegato. Non sono il comando di verifica predefinito."
+  },
+  "protocol": {
+    "board_dir": ".company/board",
+    "tickets_dir": ".company/board/tickets",
+    "handoffs_dir": ".company/board/handoffs",
+    "packs_dir": ".company/board/packs",
+    "escalations_dir": ".company/escalations",
+    "templates_dir": ".company/templates",
+    "protocol_dir": ".company/protocol"
+  },
+  "policy": {
+    "max_qa_retries": 3,
+    "max_lead_cycles": 1,
+    "branch_prefix": "feature",
+    "base_branch": "main",
+    "test_path_globs": [
+      "tests/**",
+      "test/**",
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/tests/**"
+    ],
+    "protected_branches": [
+      "main",
+      "master",
+      "release"
+    ]
+  },
+  "agents": [
+    {
+      "name": "company-pm",
+      "title": "Product Manager / Requirements Agent",
+      "description": "Trasforma un'idea o una richiesta in un PRD strutturato, in epiche e in ticket atomici con Acceptance Criteria oggettive. Non scrive codice e non decide sull'architettura.",
+      "prompt": "prompts/pm.md",
+      "model": [
+        "@company_pm",
+        "openrouter/deepseek/deepseek-v4.1-flash-1017"
+      ],
+      "thinking_level": "high",
+      "tools": [
+        "read",
+        "grep",
+        "glob",
+        "bash",
+        "write"
+      ],
+      "spawns": [],
+      "role": "PM",
+      "produces": [
+        "PRD",
+        "epiche",
+        "ticket in stato BACKLOG/TODO"
+      ]
+    },
+    {
+      "name": "company-lead",
+      "title": "Tech Lead / Supervisor Agent",
+      "description": "Supervisore della squadra: assegna i ticket, definisce il design, guida i branch, fa code review, risolve gli stall e filtra verso il CEO. Unico ruolo autorizzato a portare un ticket in DONE e a scalare.",
+      "prompt": "prompts/tech_lead.md",
+      "model": [
+        "@company_lead",
+        "openrouter/deepseek/deepseek-v4.1-flash-1017"
+      ],
+      "thinking_level": "high",
+      "tools": [
+        "read",
+        "grep",
+        "glob",
+        "bash",
+        "write",
+        "edit",
+        "lsp",
+        "task",
+        "wait"
+      ],
+      "spawns": [
+        "company-dev",
+        "company-qa",
+        "company-pm"
+      ],
+      "role": "TECH_LEAD",
+      "produces": [
+        "design",
+        "assegnazioni",
+        "code review",
+        "escalation report"
+      ]
+    },
+    {
+      "name": "company-dev",
+      "title": "Software Developer Agent",
+      "description": "Implementa un singolo ticket alla volta in un ambiente isolato (branch/worktree dedicato), esegue build e lint locali, committa e apre la richiesta di revisione. Non fa merge e non modifica i requisiti.",
+      "prompt": "prompts/developer.md",
+      "model": [
+        "@company_dev",
+        "openrouter/deepseek/deepseek-v4.1-flash-1017"
+      ],
+      "thinking_level": "high",
+      "tools": [
+        "read",
+        "grep",
+        "glob",
+        "bash",
+        "write",
+        "edit",
+        "lsp"
+      ],
+      "spawns": [],
+      "role": "DEV",
+      "produces": [
+        "codice",
+        "commit",
+        "handoff dev->qa"
+      ]
+    },
+    {
+      "name": "company-qa",
+      "title": "QA & Testing Agent",
+      "description": "Verifica il codice del Developer contro gli Acceptance Criteria del ticket, scrive ed esegue i test, individua regressioni. Rifiuta il ticket con log precisi se i test falliscono. Non modifica il codice applicativo.",
+      "prompt": "prompts/qa.md",
+      "model": [
+        "@company_qa",
+        "openrouter/deepseek/deepseek-v4.1-flash-1017"
+      ],
+      "thinking_level": "high",
+      "tools": [
+        "read",
+        "grep",
+        "glob",
+        "bash",
+        "write",
+        "edit",
+        "lsp"
+      ],
+      "spawns": [],
+      "role": "QA",
+      "produces": [
+        "test",
+        "qa report",
+        "verdetto approvato/rifiutato"
+      ]
+    },
+    {
+      "name": "company-release",
+      "title": "Release / Operations Agent",
+      "description": "Esegue il rilascio dei ticket approvati: merge controllato su main, generazione del changelog e tag di versione. Opera solo su input del Tech Lead e non modifica il codice funzionale.",
+      "prompt": "prompts/release.md",
+      "model": [
+        "@company_release",
+        "openrouter/deepseek/deepseek-v4.1-flash-1017"
+      ],
+      "thinking_level": "low",
+      "tools": [
+        "read",
+        "grep",
+        "glob",
+        "bash",
+        "write"
+      ],
+      "spawns": [],
+      "role": "RELEASE",
+      "produces": [
+        "merge",
+        "changelog",
+        "tag"
+      ]
+    }
+  ],
+  "hierarchy": {
+    "human_ceo": "esterno al processo: riceve solo escalation con opzioni e domanda",
+    "tech_lead": "unico nodo che coordina PM, Dev, QA, Release e che decide merge e DONE",
+    "pm": "produce requisiti, non esegue lavoro tecnico",
+    "dev": "produce codice, non decide requisiti ne merge",
+    "qa": "produce verdetti, non corregge il codice applicativo",
+    "release": "produce merge e tag, su mandato del Tech Lead"
+  }
+}

@@ -1,0 +1,36 @@
+# ─── AI Company / OMP runtime ───────────────────────────────────────────────
+.omp/cache/
+.omp/sessions/
+.omp/state/
+
+# Worktree isolati creati dal Tech Lead: sono repository git annidati.
+# Senza questa regola, `git add .` li aggiunge all'indice come repository
+# incorporati e i cloni del progetto risultano incompleti.
+.company/worktrees/*
+!.company/worktrees/.gitkeep
+
+# Board e artefatti di runtime: rigenerati dal protocollo, non versionati.
+# Se vuoi tracciare i ticket, rimuovi questa riga.
+.company/board/tickets/*.json
+.company/board/handoffs/*.json
+.company/board/packs/*.md
+.company/escalations/*.md
+.company/logs/*.json
+
+*.pyc
+__pycache__/
+node_modules/
+
+# ─── Android ────────────────────────────────────────────────────────────────
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Artefatti di build in qualsiasi modulo
+build/

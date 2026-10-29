@@ -10,7 +10,9 @@ v1.2.2 verificata su Pixel 8 (Android 17) con WhatsApp 2.26.41.77 e Desktop Head
 Unit via ADB: il file vocale viene individuato **per percorso esatto** tramite
 FileObserver, il player nativo viene messo in pausa e il file viene riprodotto
 su `USAGE_MEDIA`. Verificati anche switch immediato tra vocali e auto-advance.
-Il CEO ha confermato che l'audio funziona anche tramite DHU.
+Il CEO ha confermato che l'audio funziona anche tramite DHU e che il flusso
+completo (click, stop, switch, auto-advance, nuove note in arrivo) funziona
+in modo perfetto sul campo.
 
 ## Board
 

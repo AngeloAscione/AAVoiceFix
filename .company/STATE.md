@@ -6,7 +6,7 @@
 
 ## Dove siamo
 
-v1.2 verificata su Pixel 8 (Android 17) con WhatsApp 2.26.41.77 e Desktop Head
+v1.2.1 verificata su Pixel 8 (Android 17) con WhatsApp 2.26.41.77 e Desktop Head
 Unit via ADB: il file vocale viene individuato **per percorso esatto** tramite
 FileObserver, il player nativo viene messo in pausa e il file viene riprodotto
 su `USAGE_MEDIA`. Verificati anche switch immediato tra vocali e auto-advance.
@@ -59,6 +59,7 @@ campo; il Tech Lead ha implementato e calibrato direttamente.
 | Secondo click sullo stesso vocale | `stesso vocale: player fermato` + pausa nativa |
 | Auto-advance con player nativo attivo | `auto: pausa del player nativo inviata` + playback del file aperto |
 | Auto-advance mentre il nostro player suona | ferma il precedente e riproduce il nuovo |
+| `OPEN` di un vocale scaricato, senza playback nativo | **ignorato** (nessun audio) |
 | Player nativo durante il nostro playback | tutte le `control_btn` su `Riproduci` |
 | Audio udibile via DHU | **ok, confermato dal CEO** |
 | `./gradlew :app:assembleRelease` + `apksigner verify` | ok: APK release firmato, `minSdk 35`, versione 1.2 |
@@ -67,9 +68,10 @@ campo; il Tech Lead ha implementato e calibrato direttamente.
 
 Nessun bug noto nel flusso verificato. Rischi aperti, in ordine di priorità:
 
-1. **Auto-advance euristico**: un `OPEN` senza click viene trattato come
-   playback. Se WhatsApp aprisse un file per preload, partirebbe in anticipo.
-   Nei test osservati l'`OPEN` coincide sempre con il playback.
+1. **Auto-advance**: ora richiede una nota nativa in stato `Pausa` **e** la
+   corrispondenza di durata tra file aperto e nota in riproduzione. Un
+   download viene ignorato. Residuo: un download con la stessa durata della
+   nota in riproduzione potrebbe ancora passare; caso raro.
 2. **Pausa nativa quando WhatsApp non è in foreground**: `rootInActiveWindow`
    può non contenere il fumetto; l'auto-advance riprodurrebbe il file senza
    fermare il player nativo (possibile doppio audio sul telefono).

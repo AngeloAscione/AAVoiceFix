@@ -116,6 +116,13 @@ class VoiceNoteOpenWatcher(
         }
     }
 
+    /** Ignora un singolo open di probe (lettura durata) per un breve periodo. */
+    fun ignoreOwnFor(path: String, forMs: Long) {
+        synchronized(lock) {
+            ignoreUntil[path] = SystemClock.elapsedRealtime() + forMs
+        }
+    }
+
     fun releaseOwn(path: String) {
         synchronized(lock) {
             ignoreUntil.remove(path)

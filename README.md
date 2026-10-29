@@ -81,8 +81,10 @@ unità nativa: nessun polling, nessun servizio in background aggiuntivo.
    se è un vocale **diverso**, ferma il precedente e riproduce subito il nuovo
    (un solo click).
 8. **Auto-advance**: se WhatsApp apre un vocale senza un click (passa da solo
-   alla nota successiva), il servizio lo rileva dal `FileObserver`, cerca il
-   controllo nativo in stato `Pausa`, lo clicca e riproduce il file aperto.
+   alla nota successiva), il servizio lo rileva dal `FileObserver` e riproduce
+   il file aperto **solo se** esiste davvero una nota nativa in stato `Pausa`
+   e la durata reale del file corrisponde a quella della nota in riproduzione.
+   Un `OPEN` causato da un download di messaggio in entrata viene ignorato.
    Il debounce di 300 ms evita di duplicare il percorso quando l'`OPEN` è
    causato da un click reale.
 
@@ -250,6 +252,8 @@ Se un vocale resta muto, il log indica quale fase è fallita:
 | `match cache …` | riascolto: percorso esatto preso dalla cache di sessione |
 | `match … durata=… mtime=…` | fallback per durata (OPEN assente) |
 | `auto-advance …` | WhatsApp è passato da solo alla nota successiva |
+| `auto ignorato: nessuna riproduzione nativa in corso` | `OPEN` da download, non da playback |
+| `auto ignorato: file non corrisponde…` | il file aperto non è la nota in riproduzione |
 | `auto: pausa del player nativo inviata` | pausa della nota nativa in auto-advance |
 | `switch vocale: …` | click su un vocale diverso durante il playback |
 | `stesso vocale: player fermato` | secondo click sullo stesso vocale |

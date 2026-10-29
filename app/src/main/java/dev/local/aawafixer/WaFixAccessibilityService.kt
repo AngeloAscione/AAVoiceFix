@@ -12,6 +12,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.abs
 
 /**
  * Intercettore trasparente.
@@ -312,30 +313,65 @@ class WaFixAccessibilityService : AccessibilityService() {
         val file = File(path)
         if (!file.isFile || path == currentOwnPath) return
 
+        // Un OPEN non basta: WhatsApp apre i file anche quando li scarica.
+        // L'auto-advance esiste solo se c'e' una nota nativa in riproduzione.
+        val pauseControl = findPauseControl()
+        if (pauseControl == null) {
+            openWatcher.clearPending()
+            Log.i(AppConfig.TAG, "auto ignorato: nessuna riproduzione nativa in corso")
+            return
+        }
+
         val bubble = try {
-            findPauseControl()?.let { locateBubble(it) }
+            locateBubble(pauseControl)
         } catch (t: Throwable) {
             Log.e(AppConfig.TAG, "auto: lettura albero WhatsApp fallita", t)
             null
         }
-        if (bubble != null) {
-            clickNodeNow(bubble)
-        } else {
-            Log.d(AppConfig.TAG, "auto: controllo nativo in pausa non trovato")
+        if (bubble == null) {
+            openWatcher.clearPending()
+            Log.i(AppConfig.TAG, "auto ignorato: fumetto della nota in riproduzione non riconosciuto")
+            return
         }
 
+        val expectedMs = bubble.meta.durationSeconds?.times(1000L)
+        if (expectedMs == null) {
+            openWatcher.clearPending()
+            Log.i(AppConfig.TAG, "auto ignorato: durata della nota nativa non disponibile")
+            return
+        }
+
+        // La lettura della durata apre il file: va ignorata dal watcher.
+        openWatcher.ignoreOwnFor(file.absolutePath, 3_000L)
+        val actualMs = OpusDuration.fromFile(file)
+        if (actualMs == null ||
+            abs(actualMs - expectedMs) > VoiceNoteMatcher.DURATION_TOLERANCE_MS
+        ) {
+            openWatcher.clearPending()
+            Log.i(
+                AppConfig.TAG,
+                "auto ignorato: file non corrisponde alla nota nativa " +
+                    "(attesa=${expectedMs}ms reale=${actualMs}ms)",
+            )
+            return
+        }
+
+        clickNodeNow(bubble)
         if (player.isActive) {
             Log.i(AppConfig.TAG, "auto: fermo il player precedente")
             player.stop()
         }
 
+        // Da qui in poi il file e' nostro: ignora gli open fino a fine traccia.
         openWatcher.ignoreOwn(file.absolutePath)
         val started = player.play(Uri.fromFile(file))
         if (started) {
             currentOwnPath = file.absolutePath
-            currentSignature = bubble?.meta?.signature
-            val extra = bubble?.meta?.summary?.let { " ($it)" }.orEmpty()
-            Log.i(AppConfig.TAG, "auto-advance ${file.name}$extra")
+            currentSignature = bubble.meta.signature
+            Log.i(
+                AppConfig.TAG,
+                "auto-advance ${file.name} (${bubble.meta.summary})",
+            )
             StatusStore.set(this, "auto ${file.name}")
         } else {
             openWatcher.releaseOwn(file.absolutePath)

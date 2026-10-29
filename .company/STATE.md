@@ -132,6 +132,7 @@ Nessuna.
 - Gradle 9.8.2 / JDK 21; `minSdk 35` (Android 15+), `targetSdk 37`.
 - Remoto GitHub: `origin` → `git@github.com:AngeloAscione/AAVoiceFix.git`
   (canale unico di distribuzione; niente F-Droid).
+- Identità commit: Angelo Ascione <iosonoangeloascione@gmail.com>.
 - Firma release: `keystore/aawafixer-release.jks` + `keystore.properties`
   (entrambi gitignored). Alias `aawafixer`, DN
   `CN=AA Voice Fix, OU=Community, O=AA Voice Fix, C=IT`.
@@ -148,7 +149,7 @@ Nessuna.
 
 ## Prossimo passo
 
-Il repository è su GitHub (`origin/main`, ultimo push `40f84ce`). Pubblicare
+Il repository è su GitHub (`origin/main`). Pubblicare
 la release **v1.2.2** con l'APK firmato:
 
 ```bash

@@ -274,7 +274,7 @@ Per calibrare un aggiornamento di WhatsApp, servono nell'ordine:
 ## Licenza
 
 Apache License 2.0 — vedi [`LICENSE`](LICENSE) e [`NOTICE`](NOTICE).
-Copyright 2026 AA Voice Fix contributors.
+Copyright 2026 Angelo Ascione.
 
 ## Limiti noti
 

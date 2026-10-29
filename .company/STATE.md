@@ -118,12 +118,11 @@ Nessun bug noto nel flusso verificato. Rischi aperti, in ordine di priorità:
 | D8 | Player fuori chat | non intercettato |
 | D9 | Cache | nessun comando di invalidazione |
 | D10 | Licenza open-source | **Apache-2.0**, `LICENSE` + `NOTICE` |
+| D11 | Canale di distribuzione | **solo GitHub**: `git@github.com:AngeloAscione/AAVoiceFix.git` |
 
 **Ancora aperte**
 
-| ID | Decisione | Stato |
-|---|---|---|
-| D11 | Canale definitivo: GitHub releases, F-Droid o entrambi | aperta |
+Nessuna.
 
 ## Ambiente: le trappole
 
@@ -131,6 +130,8 @@ Nessun bug noto nel flusso verificato. Rischi aperti, in ordine di priorità:
 - Comandi verificati: `company init . --detect` (stack android) coincide con
   il manifest.
 - Gradle 9.8.2 / JDK 21; `minSdk 35` (Android 15+), `targetSdk 37`.
+- Remoto GitHub: `origin` → `git@github.com:AngeloAscione/AAVoiceFix.git`
+  (canale unico di distribuzione; niente F-Droid).
 - Firma release: `keystore/aawafixer-release.jks` + `keystore.properties`
   (entrambi gitignored). Alias `aawafixer`, DN
   `CN=AA Voice Fix, OU=Community, O=AA Voice Fix, C=IT`.

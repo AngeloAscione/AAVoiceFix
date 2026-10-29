@@ -148,15 +148,18 @@ Nessuna.
 
 ## Prossimo passo
 
-Collegare un'auto reale (o un device con uscita audio) e verificare che il
-vocale si senta dalle casse. Log:
+Il repository è su GitHub (`origin/main`, ultimo push `40f84ce`). Pubblicare
+la release **v1.2.2** con l'APK firmato:
 
 ```bash
-adb logcat -s AAWaFixer
+./gradlew :app:assembleRelease
+git tag -a v1.2.2 -m "AA Voice Fix 1.2.2"
+git push origin v1.2.2
+# poi allegare app/build/outputs/apk/release/app-release.apk alla release
 ```
 
-Attesi: `OPEN catturato` o `match cache`, `pausa del player nativo inviata`,
-`riproduco …`, `vocale terminato`.
+Note release: Apache-2.0, Android 15+, niente Play Store. Il keystore e
+`keystore.properties` restano fuori dal repository e vanno conservati.
 
 ## Come riprendere in una sessione nuova
 

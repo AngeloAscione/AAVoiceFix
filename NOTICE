@@ -1,0 +1,16 @@
+AA Voice Fix
+Copyright 2026 AA Voice Fix contributors
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file for the full license text.
+
+Third-party components (all Apache License 2.0):
+
+- AndroidX Car App Library (androidx.car.app:app)
+  Copyright The Android Open Source Project
+- AndroidX Media3 / ExoPlayer (androidx.media3:media3-exoplayer)
+  Copyright The Android Open Source Project
+- AndroidX DocumentFile (androidx.documentfile:documentfile)
+  Copyright The Android Open Source Project
+- Kotlin standard library
+  Copyright JetBrains s.r.o. and Kotlin Programming Language contributors

@@ -271,6 +271,11 @@ Per calibrare un aggiornamento di WhatsApp, servono nell'ordine:
 `viewId` e `contentDescription` con i pattern in
 `app/src/main/java/dev/local/aawafixer/WhatsAppUi.kt`.
 
+## Licenza
+
+Apache License 2.0 — vedi [`LICENSE`](LICENSE) e [`NOTICE`](NOTICE).
+Copyright 2026 AA Voice Fix contributors.
+
 ## Limiti noti
 
 - WhatsApp può cambiare layout/label in qualsiasi aggiornamento: il parser è

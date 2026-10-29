@@ -117,12 +117,12 @@ Nessun bug noto nel flusso verificato. Rischi aperti, in ordine di priorità:
 | D7 | Lingue | solo IT/EN |
 | D8 | Player fuori chat | non intercettato |
 | D9 | Cache | nessun comando di invalidazione |
+| D10 | Licenza open-source | **Apache-2.0**, `LICENSE` + `NOTICE` |
 
 **Ancora aperte**
 
 | ID | Decisione | Stato |
 |---|---|---|
-| D10 | Licenza open-source (MIT / Apache-2.0 / GPL-3.0) | aperta |
 | D11 | Canale definitivo: GitHub releases, F-Droid o entrambi | aperta |
 
 ## Ambiente: le trappole

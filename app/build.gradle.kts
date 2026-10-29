@@ -14,6 +14,14 @@ val signingProperties = Properties().apply {
     }
 }
 
+// Apache-2.0: LICENSE e NOTICE devono viaggiare con l'APK distribuito.
+val licenseAssetsDir = layout.buildDirectory.dir("generated/licenseAssets").get().asFile
+val copyLicenseAssets = tasks.register<Copy>("copyLicenseAssets") {
+    from(rootProject.file("LICENSE")) { into("licenses") }
+    from(rootProject.file("NOTICE")) { into("licenses") }
+    into(licenseAssetsDir)
+}
+
 android {
     namespace = "dev.local.aawafixer"
     compileSdk = 37
@@ -48,6 +56,8 @@ android {
         }
     }
 
+    sourceSets.getByName("main").assets.srcDir(licenseAssetsDir)
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -57,6 +67,8 @@ android {
         abortOnError = true
     }
 }
+
+tasks.named("preBuild").configure { dependsOn(copyLicenseAssets) }
 
 dependencies {
     // Stato ufficiale della connessione Android Auto (proiezione / nativo).

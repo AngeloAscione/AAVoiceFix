@@ -1,12 +1,10 @@
 package dev.local.aawafixer
 
-import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
@@ -110,20 +108,11 @@ class MainActivity : Activity() {
         updateAll()
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray,
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_READ_STORAGE) updateAll()
-    }
-
     private fun updateAll() {
         val accessibilityOn = isAccessibilityEnabled()
         statusAccessibility.text = "Accessibilità: ${if (accessibilityOn) "ATTIVA" else "DISATTIVA"}"
 
-        val direct = AppConfig.hasDirectFileAccess(this)
+        val direct = AppConfig.hasDirectFileAccess()
         val saf = AppConfig.safTreeUri(this)
         val fileState = when {
             direct -> "accesso completo ai file"
@@ -172,27 +161,23 @@ class MainActivity : Activity() {
     }
 
     private fun requestFileAccess() {
-        if (AppConfig.hasDirectFileAccess(this)) {
+        if (AppConfig.hasDirectFileAccess()) {
             toast(R.string.toast_files_granted)
             return
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val appIntent = Intent(
-                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                Uri.parse("package:$packageName"),
-            )
+        val appIntent = Intent(
+            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+            Uri.parse("package:$packageName"),
+        )
+        try {
+            startActivity(appIntent)
+        } catch (e: Exception) {
+            val allFiles = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
             try {
-                startActivity(appIntent)
-            } catch (e: Exception) {
-                val allFiles = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                try {
-                    startActivity(allFiles)
-                } catch (e2: Exception) {
-                    toast(R.string.toast_no_all_files_screen)
-                }
+                startActivity(allFiles)
+            } catch (e2: Exception) {
+                toast(R.string.toast_no_all_files_screen)
             }
-        } else {
-            requestPermissions(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), REQUEST_READ_STORAGE)
         }
     }
 
@@ -244,6 +229,5 @@ class MainActivity : Activity() {
 
     companion object {
         private const val REQUEST_SAF = 1001
-        private const val REQUEST_READ_STORAGE = 1002
     }
 }

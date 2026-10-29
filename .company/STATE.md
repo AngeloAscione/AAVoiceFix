@@ -10,7 +10,7 @@ v1.2 verificata su Pixel 8 (Android 17) con WhatsApp 2.26.41.77 e Desktop Head
 Unit via ADB: il file vocale viene individuato **per percorso esatto** tramite
 FileObserver, il player nativo viene messo in pausa e il file viene riprodotto
 su `USAGE_MEDIA`. Verificati anche switch immediato tra vocali e auto-advance.
-Manca solo la prova acustica su un'auto reale.
+Il CEO ha confermato che l'audio funziona anche tramite DHU.
 
 ## Board
 
@@ -60,62 +60,75 @@ campo; il Tech Lead ha implementato e calibrato direttamente.
 | Auto-advance con player nativo attivo | `auto: pausa del player nativo inviata` + playback del file aperto |
 | Auto-advance mentre il nostro player suona | ferma il precedente e riproduce il nuovo |
 | Player nativo durante il nostro playback | tutte le `control_btn` su `Riproduci` |
-| Audio udibile in auto | **non provato** (DHU non ha casse) |
+| Audio udibile via DHU | **ok, confermato dal CEO** |
+| `./gradlew :app:assembleRelease` + `apksigner verify` | ok: APK release firmato, `minSdk 35`, versione 1.2 |
 
 ## Difetti noti / rischi aperti
 
 Nessun bug noto nel flusso verificato. Rischi aperti, in ordine di priorità:
 
-1. **Audio in auto non provato** (DHU non ha casse). È l'unica verifica
-   mancante sul funzionamento reale del prodotto.
-2. **Auto-advance euristico**: un `OPEN` senza click viene trattato come
+1. **Auto-advance euristico**: un `OPEN` senza click viene trattato come
    playback. Se WhatsApp aprisse un file per preload, partirebbe in anticipo.
    Nei test osservati l'`OPEN` coincide sempre con il playback.
-3. **Pausa nativa quando WhatsApp non è in foreground**: `rootInActiveWindow`
+2. **Pausa nativa quando WhatsApp non è in foreground**: `rootInActiveWindow`
    può non contenere il fumetto; l'auto-advance riprodurrebbe il file senza
    fermare il player nativo (possibile doppio audio sul telefono).
-4. **Scope del watcher**: solo cartelle di oggi/ieri e le 2 più recenti. Le
+3. **Scope del watcher**: solo cartelle di oggi/ieri e le 2 più recenti. Le
    note più vecchie usano il fallback (1-2 s) e possono essere ambigue.
-5. **Collisione firma cache**: stesso mittente + stessa durata + stesso minuto
+4. **Collisione firma cache**: stesso mittente + stessa durata + stesso minuto
    → un click su un altro vocale verrebbe trattato come "stesso vocale".
    Caso raro; la firma non include bounds o percorso.
-6. **Cache di fallback**: un match sbagliato per durata resta in cache fino
-   alla disconnessione AA; non c'è un comando per invalidarla.
-7. **Player fuori chat escluso**: il tasto `out_of_chat_playback_btn` non
-   espone durata/orario, quindi non viene intercettato (resta il bug nativo).
-8. **WhatsApp Business** (`com.whatsapp.w4b`) non supportato.
-9. **Localizzazione**: durata in parole riconosciuta in italiano/inglese;
-   altre lingue (`Sekunden`, `segundos`, …) non sono coperte.
-10. **Layout WhatsApp**: fixture e label sono validi per 2.26.41.77; un
-    aggiornamento può richiedere nuova calibrazione.
-11. **SAF**: percorso senza watcher, scansione DocumentFile più lenta; mai
-    provato su device reale.
-12. **Storage secondario / multi-utente** non supportati: solo primary
-    external storage dell'utente corrente.
-13. **Android 10–12** non provati (minSdk 29); test solo su Android 17.
-14. **Pausa nativa a 350 ms**: su device lenti può arrivare tardi; il log
-    dice se il click fallisce.
-15. **Nessun test automatico del servizio**: parser/matcher/watcher/policy
-    sono unit-testati; il flusso click→pause→play è verificato solo a mano.
-16. **Release**: nessuna firma release né R8; decisione CEO ancora aperta.
-17. **Force-stop**: disabilita il servizio di accessibilità (documentato);
+5. **Cache di fallback**: un match sbagliato per durata resta in cache fino
+   alla disconnessione AA (scelta CEO: nessun comando di invalidazione).
+6. **Layout WhatsApp**: fixture e label sono validi per 2.26.41.77; un
+   aggiornamento può richiedere nuova calibrazione.
+7. **SAF**: percorso senza watcher, scansione DocumentFile più lenta; non è
+   il percorso ufficiale (si usa `MANAGE_EXTERNAL_STORAGE`).
+8. **Pausa nativa a 350 ms**: su device lenti può arrivare tardi; il log
+   dice se il click fallisce.
+9. **Nessun test automatico del servizio**: parser/matcher/watcher/policy
+   sono unit-testati; il flusso click→pause→play è verificato solo a mano.
+10. **Perdita del keystore**: senza `keystore/aawafixer-release.jks` e
+    `keystore.properties` non si possono firmare aggiornamenti compatibili.
+    Devono essere conservati fuori dal repository.
+11. **Force-stop**: disabilita il servizio di accessibilità (documentato);
     dopo un force-stop va rilanciato `scripts/adb-setup.sh`.
-18. **Privacy log**: risolto in questa revisione; il log dei click non
-    include più il `contentDescription` dei nodi WhatsApp.
 
-## Decisioni aperte (spettano al CEO)
+## Decisioni CEO
+
+**Chiuse**
+
+| ID | Decisione | Esito |
+|---|---|---|
+| D1 | Prova acustica | **ok via DHU**, audio funzionante (conferma CEO) |
+| D2 | Distribuzione | niente Play Store; canali open (GitHub/F-Droid/amici); R8 off; keystore release creato fuori dal repo |
+| D3 | WhatsApp Business | non supportato (solo `com.whatsapp`) |
+| D4 | Permessi storage | `MANAGE_EXTERNAL_STORAGE`; nessun hardening |
+| D5 | Android minimo | **Android 15+ (API 35)** |
+| D6 | Storage | solo primary storage dell'utente corrente |
+| D7 | Lingue | solo IT/EN |
+| D8 | Player fuori chat | non intercettato |
+| D9 | Cache | nessun comando di invalidazione |
+
+**Ancora aperte**
 
 | ID | Decisione | Stato |
 |---|---|---|
-| D1 | Prova acustica su auto reale con WhatsApp + Android Auto | aperta |
-| D2 | Distribuzione (firma release, R8) | aperta |
+| D10 | Licenza open-source (MIT / Apache-2.0 / GPL-3.0) | aperta |
+| D11 | Canale definitivo: GitHub releases, F-Droid o entrambi | aperta |
 
 ## Ambiente: le trappole
 
 - AGP 9 include Kotlin built-in: non applicare `org.jetbrains.kotlin.android`.
 - Comandi verificati: `company init . --detect` (stack android) coincide con
   il manifest.
-- Gradle 9.8.2 / JDK 21.
+- Gradle 9.8.2 / JDK 21; `minSdk 35` (Android 15+), `targetSdk 37`.
+- Firma release: `keystore/aawafixer-release.jks` + `keystore.properties`
+  (entrambi gitignored). Alias `aawafixer`, DN
+  `CN=AA Voice Fix, OU=Community, O=AA Voice Fix, C=IT`.
+  SHA-256 certificato:
+  `7e966fbb0154ce4b3467c295e84d10a7bdfb391c9e1531fe7313c5598e812f7d`.
+  Backup obbligatorio.
 - `adb shell settings put secure enabled_accessibility_services` va eseguito
   preservando i servizi esistenti: usare `scripts/adb-setup.sh`.
 - **Non** usare `am force-stop` sull'app: Android disabilita il servizio di

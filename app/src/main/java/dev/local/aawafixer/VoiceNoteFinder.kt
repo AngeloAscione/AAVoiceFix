@@ -54,7 +54,7 @@ class VoiceNoteFinder(private val context: Context) {
     }
 
     private fun scanDirect(): List<VoiceNoteFile>? {
-        if (!AppConfig.hasDirectFileAccess(context)) return null
+        if (!AppConfig.hasDirectFileAccess()) return null
         val roots = AppConfig.directVoiceDirs()
         if (roots.isEmpty()) {
             Log.w(AppConfig.TAG, "directory WhatsApp Voice Notes non trovata")

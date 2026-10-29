@@ -34,3 +34,9 @@ local.properties
 
 # Artefatti di build in qualsiasi modulo
 build/
+
+# Firma release: il keystore e le password non entrano mai nel repository.
+/keystore.properties
+/keystore/
+*.jks
+*.keystore

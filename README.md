@@ -130,16 +130,47 @@ riascolti sono immediati e coerenti.
 
 ## Build
 
-Requisiti: JDK 17+, Android SDK 37. Gradle wrapper incluso.
+Requisiti: JDK 17+, Android SDK 37, dispositivo **Android 15+ (API 35)**.
+Gradle wrapper incluso.
 
 ```bash
 ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`.
+APK debug: `app/build/outputs/apk/debug/app-debug.apk`.
 
 Test unitari (JVM, nessun device): parser UI WhatsApp, lettura durata Ogg/Opus,
 algoritmo di matching.
+
+### Release firmata (GitHub / amici)
+
+La firma è gestita da `keystore.properties` e da un keystore **fuori dal
+repository** (entrambi ignorati da git). Senza questi file `assembleRelease`
+produce un APK non firmato.
+
+```bash
+cp keystore.properties.example keystore.properties
+# inserisci le password in keystore.properties e genera la chiave una volta:
+keytool -genkeypair -v \
+  -keystore keystore/aawafixer-release.jks \
+  -alias aawafixer -keyalg RSA -keysize 4096 -validity 10000 \
+  -dname "CN=AA Voice Fix, OU=Community, O=AA Voice Fix, C=IT"
+
+./gradlew :app:assembleRelease
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs \
+  app/build/outputs/apk/release/app-release.apk
+```
+
+Note:
+
+- Il keystore e le password vanno conservati: senza la stessa chiave non si
+  possono firmare aggiornamenti installabili sopra la versione precedente.
+- R8/offuscamento **disattivati** per scelta (progetto open).
+- F-Droid, se si pubblica lì, ricompila e firma con la **propria** chiave; la
+  chiave qui serve per APK diretti/GitHub. La presenza di
+  `MANAGE_EXTERNAL_STORAGE` può richiedere una revisione manuale da parte di
+  F-Droid.
+- Supporto: solo Android 15+.
 
 ## Setup via ADB USB (una volta sola)
 
@@ -157,16 +188,13 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 # 2. accesso completo ai file (necessario per leggere Android/media/com.whatsapp)
 adb shell appops set dev.local.aawafixer MANAGE_EXTERNAL_STORAGE allow
 
-# 3. solo Android <= 12: permesso storage legacy
-adb shell pm grant dev.local.aawafixer android.permission.READ_EXTERNAL_STORAGE
-
-# 4. abilita il servizio di accessibilità preservando quelli esistenti
+# 3. abilita il servizio di accessibilità preservando quelli esistenti
 CURRENT="$(adb shell settings get secure enabled_accessibility_services | tr -d '\r')"
 adb shell settings put secure enabled_accessibility_services \
   "${CURRENT:-dev.local.aawafixer/dev.local.aawafixer.WaFixAccessibilityService}"
 adb shell settings put secure accessibility_enabled 1
 
-# 5. verifica
+# 4. verifica
 adb shell appops get dev.local.aawafixer MANAGE_EXTERNAL_STORAGE
 adb shell settings get secure enabled_accessibility_services
 ```
@@ -250,4 +278,4 @@ Per calibrare un aggiornamento di WhatsApp, servono nell'ordine:
 - Se il file non viene trovato, il player nativo resta in pausa: meglio muto
   che sul canale sbagliato. Il log dice perché.
 - L'app non modifica WhatsApp: nessuna patch, nessun hook, nessun root.
-- Su Android 12+ il sistema mostra la notifica delle app di accessibilità.
+- Su Android 15+ il sistema mostra la notifica delle app di accessibilità.

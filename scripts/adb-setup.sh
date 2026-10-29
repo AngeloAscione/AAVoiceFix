@@ -19,12 +19,6 @@ adb install -r "$APK"
 echo "== MANAGE_EXTERNAL_STORAGE (accesso diretto alle note vocali) =="
 adb shell appops set "$PKG" MANAGE_EXTERNAL_STORAGE allow
 
-SDK="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
-if [[ "$SDK" -le 32 ]]; then
-  echo "== READ_EXTERNAL_STORAGE (Android <= 12) =="
-  adb shell pm grant "$PKG" android.permission.READ_EXTERNAL_STORAGE || true
-fi
-
 enable_accessibility() {
   local current
   current="$(adb shell settings get secure enabled_accessibility_services | tr -d '\r')"

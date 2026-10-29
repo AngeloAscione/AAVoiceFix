@@ -4,7 +4,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import java.io.File
 
@@ -24,17 +23,8 @@ object AppConfig {
     fun safTreeUri(context: Context): Uri? =
         prefs(context).getString(KEY_SAF_TREE, null)?.takeIf { it.isNotBlank() }?.let(Uri::parse)
 
-    /**
-     * Accesso diretto ai file: MANAGE_EXTERNAL_STORAGE su Android 11+,
-     * READ_EXTERNAL_STORAGE (con legacy storage) su Android 10.
-     */
-    fun hasDirectFileAccess(context: Context): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager()
-        } else {
-            context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
+    /** Accesso diretto ai file tramite MANAGE_EXTERNAL_STORAGE. */
+    fun hasDirectFileAccess(): Boolean = Environment.isExternalStorageManager()
 
     /**
      * Directory delle note vocali, dalla piu' recente struttura a quella legacy.

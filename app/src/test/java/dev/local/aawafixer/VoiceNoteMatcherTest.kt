@@ -39,27 +39,32 @@ class VoiceNoteMatcherTest {
     }
 
     @Test
-    fun fallsBackToLatestWhenNoDurationMatches() {
+    fun doesNotGuessWhenNoDurationMatches() {
         val candidates = listOf(
             MatchCandidate("older", at(8, 0), 9_000),
             MatchCandidate("newer", at(20, 0), 30_000),
         )
 
-        val chosen = VoiceNoteMatcher.choose(candidates, 24_000, 18 * 60 + 30)
-
-        assertEquals("newer", chosen?.id)
+        assertNull(VoiceNoteMatcher.choose(candidates, 24_000, 18 * 60 + 30))
     }
 
     @Test
-    fun fallsBackToLatestWhenDurationUnknown() {
+    fun doesNotGuessWhenDurationUnknown() {
         val candidates = listOf(
             MatchCandidate("older", at(8, 0), null),
             MatchCandidate("newer", at(20, 0), null),
         )
 
-        val chosen = VoiceNoteMatcher.choose(candidates, 24_000, null)
+        assertNull(VoiceNoteMatcher.choose(candidates, null, null))
+    }
 
-        assertEquals("newer", chosen?.id)
+    @Test
+    fun doesNotMatchOnClockAlone() {
+        val candidates = listOf(
+            MatchCandidate("same-clock", at(18, 30), 30_000),
+        )
+
+        assertNull(VoiceNoteMatcher.choose(candidates, 24_000, 18 * 60 + 30))
     }
 
     @Test

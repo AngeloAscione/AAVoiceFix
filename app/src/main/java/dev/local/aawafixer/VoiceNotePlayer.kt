@@ -38,7 +38,8 @@ class VoiceNotePlayer(
 
     val isActive: Boolean get() = player != null
 
-    fun play(uri: Uri) {
+    /** @return false se AudioFocus viene negato e il player non parte. */
+    fun play(uri: Uri): Boolean {
         stop()
 
         val platformAttributes = PlatformAudioAttributes.Builder()
@@ -55,7 +56,7 @@ class VoiceNotePlayer(
         if (audioManager.requestAudioFocus(request) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
             Log.w(AppConfig.TAG, "AudioFocus negato")
             onError?.invoke("AudioFocus negato da un'altra app")
-            return
+            return false
         }
         focusRequest = request
 
@@ -90,6 +91,7 @@ class VoiceNotePlayer(
         exo.prepare()
         exo.playWhenReady = true
         Log.i(AppConfig.TAG, "riproduco $uri")
+        return true
     }
 
     fun stop() {

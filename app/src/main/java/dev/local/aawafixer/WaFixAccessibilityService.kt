@@ -2,12 +2,14 @@ package dev.local.aawafixer
 
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -28,6 +30,7 @@ class WaFixAccessibilityService : AccessibilityService() {
     private lateinit var monitor: AndroidAutoMonitor
     private lateinit var player: VoiceNotePlayer
     private lateinit var finder: VoiceNoteFinder
+    private lateinit var openWatcher: VoiceNoteOpenWatcher
 
     private val main = Handler(Looper.getMainLooper())
     private val scanExecutor = Executors.newSingleThreadExecutor()
@@ -35,6 +38,13 @@ class WaFixAccessibilityService : AccessibilityService() {
 
     @Volatile
     private var suppressClicksUntil = 0L
+
+    private var currentOwnPath: String? = null
+
+    // Cache firma messaggio -> percorso esatto, valida solo per la sessione
+    // Android Auto. Serve ai riascolti, dove WhatsApp riusa il player e non
+    // genera un nuovo evento OPEN.
+    private val exactCache = HashMap<String, String>()
 
     private data class Bubble(
         val meta: VoiceNoteUi,
@@ -56,18 +66,28 @@ class WaFixAccessibilityService : AccessibilityService() {
         initialized = true
 
         finder = VoiceNoteFinder(this)
+        openWatcher = VoiceNoteOpenWatcher { AppConfig.directVoiceDirs() }
         player = VoiceNotePlayer(
             context = this,
             onPlayingChanged = { playing ->
                 StatusStore.setAudio(this, if (playing) "in riproduzione" else "fermo")
+                if (!playing) {
+                    currentOwnPath?.let { openWatcher.releaseOwn(it) }
+                    currentOwnPath = null
+                }
             },
             onError = { message -> StatusStore.set(this, message) },
         )
         monitor = AndroidAutoMonitor(this) { connected ->
             Log.i(AppConfig.TAG, "Android Auto: $connected")
-            if (!connected) {
+            if (connected) {
+                // Watcher creato solo durante la sessione Android Auto.
+                openWatcher.start()
+            } else {
                 generation.incrementAndGet()
+                openWatcher.stop()
                 player.stop()
+                exactCache.clear()
             }
         }
         monitor.start()
@@ -79,23 +99,47 @@ class WaFixAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || event.eventType != AccessibilityEvent.TYPE_VIEW_CLICKED) return
-        if (event.packageName?.toString() != AppConfig.WHATSAPP_PACKAGE) return
+        if (event == null || event.packageName?.toString() != AppConfig.WHATSAPP_PACKAGE) return
+        if (event.eventType != AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            Log.v(AppConfig.TAG, "evento WhatsApp tipo ${event.eventType} ignorato")
+            return
+        }
 
+        val source = event.source
+        Log.d(
+            AppConfig.TAG,
+            "click WhatsApp class=${event.className} source=${source != null} " +
+                "id=${source?.viewIdResourceName} desc=${source?.contentDescription}",
+        )
         if (SystemClock.uptimeMillis() < suppressClicksUntil) {
             Log.d(AppConfig.TAG, "click iniettato ignorato")
             return
         }
-        if (!monitor.isConnected) return
+        if (!monitor.isConnected) {
+            Log.d(AppConfig.TAG, "click ignorato: Android Auto non connesso")
+            return
+        }
+        if (source == null) {
+            Log.w(AppConfig.TAG, "click senza source: nodo non ispezionabile")
+            return
+        }
 
-        val source = event.source ?: return
         val bubble = try {
             locateBubble(source)
         } catch (t: Throwable) {
             Log.e(AppConfig.TAG, "lettura albero WhatsApp fallita", t)
             null
-        } ?: return
+        }
+        if (bubble == null) {
+            Log.d(AppConfig.TAG, "fumetto vocale non riconosciuto")
+            return
+        }
 
+        Log.i(
+            AppConfig.TAG,
+            "vocale ${bubble.meta.summary} id=${bubble.playViewId} " +
+                "bounds=${bubble.playBounds}",
+        )
         val scanGeneration = generation.incrementAndGet()
         val wasActive = player.isActive
         player.stop()
@@ -106,36 +150,120 @@ class WaFixAccessibilityService : AccessibilityService() {
         scheduleNativePause(bubble)
 
         if (wasActive) {
+            openWatcher.clearPending()
             Log.i(AppConfig.TAG, "secondo click: player fermato")
             return
         }
 
         val clickAt = SystemClock.uptimeMillis()
+        // L'open di WhatsApp puo' arrivare pochi ms dopo l'evento di click.
+        main.postDelayed({
+            if (scanGeneration != generation.get()) return@postDelayed
+            openWatcher.ensureFresh()
+            val caught = openWatcher.consume(EXACT_OPEN_WINDOW_MS)
+            val cached = if (caught == null) {
+                exactCache[bubble.meta.signature]?.takeIf { File(it).isFile }
+            } else {
+                null
+            }
+            val exactPath = caught ?: cached
+            if (exactPath != null) {
+                val exactFile = File(exactPath)
+                if (exactFile.isFile) {
+                    rememberExact(bubble.meta.signature, exactPath)
+                    val label = if (caught != null) {
+                        "match esatto ${exactFile.name}"
+                    } else {
+                        "match cache ${exactFile.name}"
+                    }
+                    schedulePlayback(
+                        uri = Uri.fromFile(exactFile),
+                        ownFile = exactFile,
+                        label = label,
+                        scanGeneration = scanGeneration,
+                        clickAt = clickAt,
+                    )
+                    return@postDelayed
+                }
+                Log.w(AppConfig.TAG, "file esatto sparito: $exactPath")
+            }
+            scanFallback(bubble, scanGeneration, clickAt)
+        }, EXACT_CHECK_DELAY_MS)
+    }
+
+    /** Fallback: durata UI + orario + mtime, senza il cieco "ultimo file". */
+    private fun scanFallback(bubble: Bubble, scanGeneration: Int, clickAt: Long) {
         scanExecutor.execute {
-            val file = try {
+            openWatcher.beginSelfAccess()
+            val result = try {
                 finder.find(bubble.meta)
             } catch (t: Throwable) {
                 Log.e(AppConfig.TAG, "scansione note vocali fallita", t)
                 null
+            } finally {
+                openWatcher.endSelfAccess()
             }
-            main.postDelayed({
+            main.post {
                 if (scanGeneration != generation.get()) {
                     Log.d(AppConfig.TAG, "scansione superata da un nuovo click")
-                    return@postDelayed
+                    return@post
                 }
+                val file = result?.file
                 if (file == null) {
                     Log.w(AppConfig.TAG, "nessun .opus trovato per ${bubble.meta.summary}")
                     StatusStore.set(this, "nessun .opus per ${bubble.meta.summary}")
-                    return@postDelayed
+                    return@post
                 }
-                Log.i(
-                    AppConfig.TAG,
-                    "match ${file.name} mtime=${file.lastModified} durata=${file.durationMs}",
+                val ownFile = if (file.uri.scheme == "file") {
+                    file.uri.path?.let(::File)
+                } else {
+                    null
+                }
+                if (ownFile != null) {
+                    // Il fallback e' deterministico: memorizzarlo rende
+                    // immediati i riascolti (WhatsApp riusa il player e non
+                    // genera un nuovo OPEN). La cache vive solo nella sessione
+                    // Android Auto.
+                    rememberExact(bubble.meta.signature, ownFile.absolutePath)
+                }
+                schedulePlayback(
+                    uri = file.uri,
+                    ownFile = ownFile,
+                    label = "match ${file.name} durata=${file.durationMs} mtime=${file.lastModified}",
+                    scanGeneration = scanGeneration,
+                    clickAt = clickAt,
                 )
-                StatusStore.set(this, "match ${file.name} (${file.durationMs ?: "?"} ms)")
-                player.play(file.uri)
-            }, (PLAY_DELAY_MS - (SystemClock.uptimeMillis() - clickAt)).coerceAtLeast(0L))
+            }
         }
+    }
+
+    private fun rememberExact(signature: String, path: String) {
+        if (exactCache.size > 128) exactCache.clear()
+        exactCache[signature] = path
+    }
+
+    private fun schedulePlayback(
+        uri: Uri,
+        ownFile: File?,
+        label: String,
+        scanGeneration: Int,
+        clickAt: Long,
+    ) {
+        val delay = (PLAY_DELAY_MS - (SystemClock.uptimeMillis() - clickAt)).coerceAtLeast(0L)
+        main.postDelayed({
+            if (scanGeneration != generation.get()) return@postDelayed
+            Log.i(AppConfig.TAG, label)
+            StatusStore.set(this, label)
+            val started = player.play(uri)
+            if (started) {
+                // ExoPlayer apre il file sul suo thread di playback: l'ignore
+                // va impostato subito dopo l'avvio, prima che l'open arrivi.
+                ownFile?.let { path ->
+                    currentOwnPath = path.absolutePath
+                    openWatcher.ignoreOwn(path.absolutePath)
+                }
+            }
+        }, delay)
     }
 
     override fun onInterrupt() = Unit
@@ -143,6 +271,7 @@ class WaFixAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         generation.incrementAndGet()
         if (initialized) {
+            openWatcher.stop()
             monitor.stop()
             player.stop()
         }
@@ -158,7 +287,11 @@ class WaFixAccessibilityService : AccessibilityService() {
      */
     @Suppress("DEPRECATION")
     private fun locateBubble(source: AccessibilityNodeInfo): Bubble? {
-        val playReference = findPlayReference(source) ?: return null
+        val playReference = findPlayReference(source)
+        if (playReference == null) {
+            Log.d(AppConfig.TAG, "nessun pulsante Play nel sottoalbero del click")
+            return null
+        }
 
         var current: AccessibilityNodeInfo? = source
         var depth = 0
@@ -175,7 +308,9 @@ class WaFixAccessibilityService : AccessibilityService() {
                 // Il confronto e' per viewId + bounds: i wrapper
                 // AccessibilityNodeInfo non sono reference-stable tra sottoalberi.
                 if (handle != null && samePlayNode(flatPlay, playReference)) {
-                    val score = (if (meta.durationSeconds != null) 1 else 0) +
+                    // La durata pesa piu' dell'orario: un livello con sola
+                    // durata non deve perdere contro uno con solo orario.
+                    val score = (if (meta.durationSeconds != null) 2 else 0) +
                         (if (meta.clockMinutes != null) 1 else 0)
                     if (score > bestScore) {
                         best = Bubble(
@@ -191,12 +326,15 @@ class WaFixAccessibilityService : AccessibilityService() {
                         )
                         bestScore = score
                     }
-                    if (bestScore == 2) break
+                    if (bestScore >= 3) break
                 }
             }
             current = current.parent
             depth++
             if (current?.packageName?.toString() != AppConfig.WHATSAPP_PACKAGE) break
+        }
+        if (best == null) {
+            Log.d(AppConfig.TAG, "fumetto trovato ma senza durata/orario riconoscibili")
         }
         return best
     }
@@ -317,6 +455,8 @@ class WaFixAccessibilityService : AccessibilityService() {
     companion object {
         private const val PAUSE_DELAY_MS = 350L
         private const val PLAY_DELAY_MS = 450L
+        private const val EXACT_CHECK_DELAY_MS = 120L
+        private const val EXACT_OPEN_WINDOW_MS = 2_500L
         private const val SUPPRESS_WINDOW_MS = 1_500L
         private const val MAX_ANCESTOR_DEPTH = 9
         private const val MAX_PLAY_SEARCH_DEPTH = 4

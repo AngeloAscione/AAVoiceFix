@@ -81,6 +81,19 @@ class WhatsAppUiParserTest {
     }
 
     @Test
+    fun rejectsOutOfChatPlaybackControl() {
+        val nodes = voiceBubble().map { node ->
+            if (node.viewId == "com.whatsapp:id/voice_note_play") {
+                node.copy(viewId = "com.whatsapp:id/out_of_chat_playback_btn")
+            } else {
+                node
+            }
+        }
+
+        assertNull(WhatsAppUiParser.parse(nodes))
+    }
+
+    @Test
     fun rejectsVideoPlayButtons() {
         val nodes = voiceBubble(
             playDescription = "Riproduci video",
@@ -106,6 +119,82 @@ class WhatsAppUiParserTest {
         )
 
         assertNull(WhatsAppUiParser.parse(nodes))
+    }
+
+    @Test
+    fun ignoresSeekbarElapsedTextEvenWithoutKeyword() {
+        val nodes = listOf(
+            node(
+                viewId = "com.whatsapp:id/main_layout",
+                className = "android.widget.LinearLayout",
+                contentDescription = "Greg Garofalo, messaggio vocale, 17 secondi, 6:30 PM, riprodotto",
+                left = 44,
+                top = 1423,
+                right = 876,
+                bottom = 1592,
+            ),
+            node(
+                viewId = "com.whatsapp:id/control_btn",
+                className = "android.widget.ImageButton",
+                contentDescription = "Riproduci messaggio vocale",
+                left = 76,
+                top = 1428,
+                right = 218,
+                bottom = 1570,
+            ),
+            node(
+                viewId = "com.whatsapp:id/audio_seekbar",
+                className = "android.widget.SeekBar",
+                contentDescription = "Messaggio vocale, 0 secondi",
+                left = 218,
+                top = 1428,
+                right = 682,
+                bottom = 1570,
+            ),
+        )
+
+        val result = WhatsAppUiParser.parse(nodes)!!
+
+        assertEquals(17, result.durationSeconds)
+        assertEquals(18 * 60 + 30, result.clockMinutes)
+    }
+
+    @Test
+    fun recognizesControlInPlayingState() {
+        val nodes = listOf(
+            node(
+                viewId = "com.whatsapp:id/main_layout",
+                className = "android.widget.LinearLayout",
+                contentDescription = "Greg Garofalo, messaggio vocale, 17 secondi, 6:30 PM, riprodotto",
+                left = 44,
+                top = 1423,
+                right = 876,
+                bottom = 1592,
+            ),
+            node(
+                viewId = "com.whatsapp:id/control_btn",
+                className = "android.widget.ImageButton",
+                contentDescription = "Pausa messaggio vocale",
+                left = 76,
+                top = 1428,
+                right = 218,
+                bottom = 1570,
+            ),
+            node(
+                viewId = "com.whatsapp:id/audio_seekbar",
+                className = "android.widget.SeekBar",
+                contentDescription = "Messaggio vocale, tempo trascorso: 8 secondi",
+                left = 218,
+                top = 1428,
+                right = 682,
+                bottom = 1570,
+            ),
+        )
+
+        val result = WhatsAppUiParser.parse(nodes)!!
+
+        assertEquals(17, result.durationSeconds)
+        assertEquals(18 * 60 + 30, result.clockMinutes)
     }
 
     @Test

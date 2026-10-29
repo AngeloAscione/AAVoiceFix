@@ -13,11 +13,14 @@ object VoiceNoteMatcher {
     const val DURATION_TOLERANCE_MS = 1_500L
 
     /**
-     * Regole, nell'ordine:
-     * 1. i file con durata entro la tolleranza dal valore mostrato in chat;
-     * 2. tra questi, quello con orario di modifica piu' vicino all'orario del
-     *    messaggio (distanza circolare sulla giornata), a parita' il piu' recente;
-     * 3. se nessun file ha la durata giusta, l'ultimo .opus modificato.
+     * Fallback usato solo quando FileObserver non ha catturato l'open esatto:
+     * 1. solo file con durata entro la tolleranza dal valore mostrato in chat;
+     * 2. tra questi, quello con mtime piu' vicino all'orario del messaggio
+     *    (distanza circolare sulla giornata), a parita' il piu' recente.
+     *
+     * Niente fallback all'ultimo file: dopo i test sul campo riprodurre un
+     * vocale sbagliato e' peggio che non riprodurre nulla. Il chiamante
+     * registra il caso nel log e nella telemetria.
      */
     fun choose(
         candidates: List<MatchCandidate>,
@@ -25,26 +28,25 @@ object VoiceNoteMatcher {
         targetClockMinutes: Int?,
         toleranceMs: Long = DURATION_TOLERANCE_MS,
     ): MatchCandidate? {
-        if (candidates.isEmpty()) return null
+        if (candidates.isEmpty() || targetDurationMs == null) return null
 
-        val durationMatches = if (targetDurationMs == null) {
-            emptyList()
-        } else {
-            candidates.filter { candidate ->
-                val duration = candidate.durationMs ?: return@filter false
-                abs(duration - targetDurationMs) <= toleranceMs
-            }
+        return durationMatches(candidates, targetDurationMs, toleranceMs).sortedWith(
+            compareBy<MatchCandidate> {
+                clockDistanceMinutes(it.lastModified, targetClockMinutes)
+            }.thenByDescending { it.lastModified },
+        ).firstOrNull()
+    }
+
+    private fun durationMatches(
+        candidates: List<MatchCandidate>,
+        targetDurationMs: Long?,
+        toleranceMs: Long = DURATION_TOLERANCE_MS,
+    ): List<MatchCandidate> {
+        if (targetDurationMs == null) return emptyList()
+        return candidates.filter { candidate ->
+            val duration = candidate.durationMs ?: return@filter false
+            abs(duration - targetDurationMs) <= toleranceMs
         }
-
-        if (durationMatches.isNotEmpty()) {
-            return durationMatches.sortedWith(
-                compareBy<MatchCandidate> {
-                    clockDistanceMinutes(it.lastModified, targetClockMinutes)
-                }.thenByDescending { it.lastModified },
-            ).first()
-        }
-
-        return candidates.maxByOrNull { it.lastModified }
     }
 
     fun clockDistanceMinutes(lastModified: Long, targetClockMinutes: Int?): Int {

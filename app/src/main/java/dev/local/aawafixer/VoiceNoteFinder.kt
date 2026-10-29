@@ -23,15 +23,26 @@ data class VoiceNoteFile(
  */
 class VoiceNoteFinder(private val context: Context) {
 
-    fun find(meta: VoiceNoteUi): VoiceNoteFile? {
+    data class FindResult(val file: VoiceNoteFile?)
+
+    fun find(meta: VoiceNoteUi): FindResult {
+        // Senza durata UI il fallback non puo' essere affidabile: inutile
+        // scansionare 200 file per poi non riprodurre nulla.
+        val targetDurationMs = meta.durationSeconds?.times(1000L)
+            ?: return FindResult(null)
         val files = scan()
-        if (files.isEmpty()) return null
+        if (files.isEmpty()) return FindResult(null)
+
+        val candidates = files.map {
+            MatchCandidate(it.uri.toString(), it.lastModified, it.durationMs)
+        }
         val chosen = VoiceNoteMatcher.choose(
-            candidates = files.map { MatchCandidate(it.uri.toString(), it.lastModified, it.durationMs) },
-            targetDurationMs = meta.durationSeconds?.times(1000L),
+            candidates = candidates,
+            targetDurationMs = targetDurationMs,
             targetClockMinutes = meta.clockMinutes,
-        ) ?: return null
-        return files.firstOrNull { it.uri.toString() == chosen.id }
+        ) ?: return FindResult(null)
+
+        return FindResult(files.firstOrNull { it.uri.toString() == chosen.id })
     }
 
     fun newest(): VoiceNoteFile? = scan().maxByOrNull { it.lastModified }

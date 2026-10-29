@@ -6,10 +6,11 @@
 
 ## Dove siamo
 
-v1.1 verificata su Pixel 8 (Android 17) con WhatsApp 2.26.41.77 e Desktop Head
+v1.2 verificata su Pixel 8 (Android 17) con WhatsApp 2.26.41.77 e Desktop Head
 Unit via ADB: il file vocale viene individuato **per percorso esatto** tramite
 FileObserver, il player nativo viene messo in pausa e il file viene riprodotto
-su `USAGE_MEDIA`. Manca solo la prova acustica su un'auto reale.
+su `USAGE_MEDIA`. Verificati anche switch immediato tra vocali e auto-advance.
+Manca solo la prova acustica su un'auto reale.
 
 ## Board
 
@@ -23,8 +24,13 @@ campo; il Tech Lead ha implementato e calibrato direttamente.
 - `VoiceNoteOpenWatcher` — `FileObserver` creato **solo durante la sessione
   Android Auto**; osserva radice + settimane ISO di oggi/ieri + 2 cartelle più
   recenti. Cattura l'`OPEN` esatto del `.opus` aperto da WhatsApp.
+- Auto-advance: un `OPEN` senza click (WhatsApp passa da solo alla nota
+  successiva) viene riprodotto dopo 300 ms; prima si clicca il controllo
+  nativo in stato `Pausa`.
 - Cache di sessione `firma messaggio → percorso`; i riascolti (WhatsApp riusa
   il player e non genera `OPEN`) usano `match cache`.
+- Click durante il playback: stesso vocale → stop; vocale diverso → switch
+  immediato con un solo click.
 - `WhatsAppUiParser` — tarato sul layout reale: durata nel
   `contentDescription` di `main_layout` (`17 secondi`), orario 12h con U+202F,
   esclusione di `description` (`0:00`), `audio_seekbar`, video e player fuori
@@ -49,7 +55,10 @@ campo; il Tech Lead ha implementato e calibrato direttamente.
 | Pixel 8 + DHU (CarConnection type=2) | watcher attivo su 3 cartelle |
 | Tap su vocale 17 s | `OPEN` esatto → `WA0027`, pausa nativa, playback |
 | Riascolto 4 s | `match cache` immediato |
-| Secondo tap durante playback | `secondo click: player fermato` + pausa nativa |
+| Click su un altro vocale durante il playback | `switch vocale`, nuovo file riprodotto al primo click |
+| Secondo click sullo stesso vocale | `stesso vocale: player fermato` + pausa nativa |
+| Auto-advance con player nativo attivo | `auto: pausa del player nativo inviata` + playback del file aperto |
+| Auto-advance mentre il nostro player suona | ferma il precedente e riproduce il nuovo |
 | Player nativo durante il nostro playback | tutte le `control_btn` su `Riproduci` |
 | Audio udibile in auto | **non provato** (DHU non ha casse) |
 
@@ -65,6 +74,12 @@ Nessuno noto nel flusso verificato. Rischi residui:
 3. Su device lenti la pausa iniettata a 350 ms può arrivare in ritardo.
 4. Il fallback può scegliere un file sbagliato solo se più file hanno la
    stessa durata e lo stesso orario; il match viene comunque loggato.
+5. L'auto-advance assume che un `OPEN` senza click significhi riproduzione:
+   se WhatsApp aprisse un file solo per preload, partirebbe in anticipo. Nei
+   test osservati l'`OPEN` coincide sempre con il playback.
+6. Con due messaggi dello stesso mittente, stessa durata e stesso minuto, la
+   firma della cache può collidere: il click verrebbe trattato come "stesso
+   vocale". Caso raro; bounds/percorso non entrano nella firma.
 
 ## Decisioni aperte (spettano al CEO)
 

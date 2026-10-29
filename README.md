@@ -77,8 +77,18 @@ unità nativa: nessun polling, nessun servizio in background aggiuntivo.
 6. **Playback**: Media3 ExoPlayer con `USAGE_MEDIA` e
    `CONTENT_TYPE_SPEECH`; AudioFocus `AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`
    (la musica si abbassa). Focus e player vengono rilasciati a fine traccia.
-7. **Toggle**: un click su un vocale mentre l'app sta riproducendo ferma il
-   player (e mette comunque in pausa quello nativo).
+7. **Click durante il playback**: se è lo **stesso** vocale, ferma il player;
+   se è un vocale **diverso**, ferma il precedente e riproduce subito il nuovo
+   (un solo click).
+8. **Auto-advance**: se WhatsApp apre un vocale senza un click (passa da solo
+   alla nota successiva), il servizio lo rileva dal `FileObserver`, cerca il
+   controllo nativo in stato `Pausa`, lo clicca e riproduce il file aperto.
+   Il debounce di 300 ms evita di duplicare il percorso quando l'`OPEN` è
+   causato da un click reale.
+
+L'intercettazione dei click resta necessaria: l'`OPEN` dice **quale file**,
+il click dice **cosa vuole l'utente** (stop, switch), copre le note vecchie
+fuori dalle cartelle osservate e il caso SAF, dove il watcher non esiste.
 
 ## Individuazione del file `.opus`
 
@@ -211,6 +221,10 @@ Se un vocale resta muto, il log indica quale fase è fallita:
 | `match esatto …` | riproduzione del file catturato dal watcher |
 | `match cache …` | riascolto: percorso esatto preso dalla cache di sessione |
 | `match … durata=… mtime=…` | fallback per durata (OPEN assente) |
+| `auto-advance …` | WhatsApp è passato da solo alla nota successiva |
+| `auto: pausa del player nativo inviata` | pausa della nota nativa in auto-advance |
+| `switch vocale: …` | click su un vocale diverso durante il playback |
+| `stesso vocale: player fermato` | secondo click sullo stesso vocale |
 | `vocale durata=… ora=…` | metadati estratti dal fumetto |
 | `nessun .opus per durata=… ora=…` | nessun file compatibile: nessun audio |
 | `click iniettato ignorato` | finestra di soppressione, normale |

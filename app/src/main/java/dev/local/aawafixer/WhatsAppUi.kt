@@ -78,6 +78,9 @@ object WhatsAppUiParser {
             (viewId.contains("voice") || viewId.contains("ptt") || viewId.contains("audio"))
     }
 
+    fun isPauseLabel(label: String?): Boolean =
+        label != null && PAUSE.containsMatchIn(label)
+
     fun hasVoiceContext(nodes: List<UiNode>): Boolean = nodes.any { node ->
         val label = node.label.orEmpty()
         VOICE.containsMatchIn(label) ||

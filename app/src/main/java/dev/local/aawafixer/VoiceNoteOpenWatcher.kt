@@ -23,6 +23,8 @@ import java.io.File
  */
 class VoiceNoteOpenWatcher(
     private val rootsProvider: () -> List<File>,
+    /** Chiamato sul thread di FileObserver per ogni OPEN accettato. */
+    private val onOpen: ((String) -> Unit)? = null,
 ) {
     private data class Watch(val path: String, val observer: FileObserver)
 
@@ -142,13 +144,18 @@ class VoiceNoteOpenWatcher(
 
     private fun record(path: String) {
         val now = SystemClock.elapsedRealtime()
+        val accepted: Boolean
         synchronized(lock) {
             val ignoredUntil = ignoreUntil[path] ?: 0
-            if (ignoredUntil > now) return
-            if (selfAccess || now < acceptAfterElapsed) return
-            lastPath = path
-            lastAtElapsed = now
+            accepted = ignoredUntil <= now && !selfAccess && now >= acceptAfterElapsed
+            if (accepted) {
+                lastPath = path
+                lastAtElapsed = now
+            }
+        }
+        if (accepted) {
             Log.d(AppConfig.TAG, "OPEN catturato: $path")
+            onOpen?.invoke(path)
         }
     }
 

@@ -14,6 +14,9 @@ Il CEO ha confermato che l'audio funziona anche tramite DHU e che il flusso
 completo (click, stop, switch, auto-advance, nuove note in arrivo) funziona
 in modo perfetto sul campo.
 
+La release **v1.2.2** è pubblicata su GitHub con APK firmato:
+<https://github.com/AngeloAscione/AAVoiceFix/releases/tag/v1.2.2>.
+
 ## Board
 
 Nessun ticket formale: il CEO ha fornito la specifica e poi il feedback sul
@@ -69,6 +72,7 @@ campo; il Tech Lead ha implementato e calibrato direttamente.
 | Player nativo durante il nostro playback | tutte le `control_btn` su `Riproduci` |
 | Audio udibile via DHU | **ok, confermato dal CEO** |
 | `./gradlew :app:assembleRelease` + `apksigner verify` | ok: APK release firmato, `minSdk 35`, versione 1.2 |
+| GitHub Release v1.2.2 | asset `app-release.apk` identico al locale (SHA-256 `e5bd77c7…ff1a4`) |
 
 ## Difetti noti / rischi aperti
 
@@ -149,18 +153,17 @@ Nessuna.
 
 ## Prossimo passo
 
-Il repository è su GitHub (`origin/main`). Pubblicare
-la release **v1.2.2** con l'APK firmato:
+Release **v1.2.2** pubblicata; nessun lavoro aperto. Manutenzione solo se
+WhatsApp cambia layout/label:
 
 ```bash
-./gradlew :app:assembleRelease
-git tag -a v1.2.2 -m "AA Voice Fix 1.2.2"
-git push origin v1.2.2
-# poi allegare app/build/outputs/apk/release/app-release.apk alla release
+adb logcat -s AAWaFixer
 ```
 
-Note release: Apache-2.0, Android 15+, niente Play Store. Il keystore e
-`keystore.properties` restano fuori dal repository e vanno conservati.
+Attesi `OPEN catturato`/`match cache`, `pausa del player nativo inviata`,
+`auto ignorato: …` per i download, `vocale terminato`. Per calibrare un nuovo
+layout aggiornare il fixture `app/src/test/resources/whatsapp_voice_note_row.xml`,
+poi bump versione + tag + release con lo stesso keystore.
 
 ## Come riprendere in una sessione nuova
 

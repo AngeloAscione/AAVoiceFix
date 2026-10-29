@@ -1,6 +1,7 @@
 # AA Voice Fix
 
 Repository: <https://github.com/AngeloAscione/AAVoiceFix>
+Release: <https://github.com/AngeloAscione/AAVoiceFix/releases/tag/v1.2.2>
 
 Intercettore trasparente per le note vocali di WhatsApp quando il telefono è
 proiettato su Android Auto.

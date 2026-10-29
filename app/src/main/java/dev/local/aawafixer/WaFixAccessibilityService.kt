@@ -313,54 +313,29 @@ class WaFixAccessibilityService : AccessibilityService() {
         val file = File(path)
         if (!file.isFile || path == currentOwnPath) return
 
+        // Se stiamo gia' riproducendo una nota, un OPEN (download o nuova
+        // nota in arrivo) non deve interromperla. Al massimo si mette in
+        // pausa il player nativo; il nuovo file parte solo con un click.
+        if (player.isActive) {
+            val pauseControl = findPauseControl()
+            if (pauseControl != null) {
+                pauseNativeNode(pauseControl)
+                Log.i(
+                    AppConfig.TAG,
+                    "auto ignorato: gia' in riproduzione; pausa nativa della nota in arrivo",
+                )
+            } else {
+                Log.i(AppConfig.TAG, "auto ignorato: gia' in riproduzione")
+            }
+            openWatcher.clearPending()
+            return
+        }
+
         // Un OPEN non basta: WhatsApp apre i file anche quando li scarica.
         // L'auto-advance esiste solo se c'e' una nota nativa in riproduzione.
-        val pauseControl = findPauseControl()
-        if (pauseControl == null) {
-            openWatcher.clearPending()
-            Log.i(AppConfig.TAG, "auto ignorato: nessuna riproduzione nativa in corso")
-            return
-        }
-
-        val bubble = try {
-            locateBubble(pauseControl)
-        } catch (t: Throwable) {
-            Log.e(AppConfig.TAG, "auto: lettura albero WhatsApp fallita", t)
-            null
-        }
-        if (bubble == null) {
-            openWatcher.clearPending()
-            Log.i(AppConfig.TAG, "auto ignorato: fumetto della nota in riproduzione non riconosciuto")
-            return
-        }
-
-        val expectedMs = bubble.meta.durationSeconds?.times(1000L)
-        if (expectedMs == null) {
-            openWatcher.clearPending()
-            Log.i(AppConfig.TAG, "auto ignorato: durata della nota nativa non disponibile")
-            return
-        }
-
-        // La lettura della durata apre il file: va ignorata dal watcher.
-        openWatcher.ignoreOwnFor(file.absolutePath, 3_000L)
-        val actualMs = OpusDuration.fromFile(file)
-        if (actualMs == null ||
-            abs(actualMs - expectedMs) > VoiceNoteMatcher.DURATION_TOLERANCE_MS
-        ) {
-            openWatcher.clearPending()
-            Log.i(
-                AppConfig.TAG,
-                "auto ignorato: file non corrisponde alla nota nativa " +
-                    "(attesa=${expectedMs}ms reale=${actualMs}ms)",
-            )
-            return
-        }
+        val bubble = resolvePlayingBubble(file) ?: return
 
         clickNodeNow(bubble)
-        if (player.isActive) {
-            Log.i(AppConfig.TAG, "auto: fermo il player precedente")
-            player.stop()
-        }
 
         // Da qui in poi il file e' nostro: ignora gli open fino a fine traccia.
         openWatcher.ignoreOwn(file.absolutePath)
@@ -375,6 +350,64 @@ class WaFixAccessibilityService : AccessibilityService() {
             StatusStore.set(this, "auto ${file.name}")
         } else {
             openWatcher.releaseOwn(file.absolutePath)
+        }
+    }
+
+    /**
+     * Nota nativa in riproduzione + file aperto con la stessa durata: solo
+     * allora l'OPEN e' un vero auto-advance.
+     */
+    private fun resolvePlayingBubble(file: File): Bubble? {
+        val pauseControl = findPauseControl()
+        if (pauseControl == null) {
+            openWatcher.clearPending()
+            Log.i(AppConfig.TAG, "auto ignorato: nessuna riproduzione nativa in corso")
+            return null
+        }
+
+        val bubble = try {
+            locateBubble(pauseControl)
+        } catch (t: Throwable) {
+            Log.e(AppConfig.TAG, "auto: lettura albero WhatsApp fallita", t)
+            null
+        }
+        if (bubble == null) {
+            openWatcher.clearPending()
+            Log.i(AppConfig.TAG, "auto ignorato: fumetto della nota in riproduzione non riconosciuto")
+            return null
+        }
+
+        val expectedMs = bubble.meta.durationSeconds?.times(1000L)
+        if (expectedMs == null) {
+            openWatcher.clearPending()
+            Log.i(AppConfig.TAG, "auto ignorato: durata della nota nativa non disponibile")
+            return null
+        }
+
+        // La lettura della durata apre il file: va ignorata dal watcher.
+        openWatcher.ignoreOwnFor(file.absolutePath, 3_000L)
+        val actualMs = OpusDuration.fromFile(file)
+        if (actualMs == null ||
+            abs(actualMs - expectedMs) > VoiceNoteMatcher.DURATION_TOLERANCE_MS
+        ) {
+            openWatcher.clearPending()
+            Log.i(
+                AppConfig.TAG,
+                "auto ignorato: file non corrisponde alla nota nativa " +
+                    "(attesa=${expectedMs}ms reale=${actualMs}ms)",
+            )
+            return null
+        }
+        return bubble
+    }
+
+    private fun pauseNativeNode(node: AccessibilityNodeInfo) {
+        suppressClicksUntil = SystemClock.uptimeMillis() + SUPPRESS_WINDOW_MS
+        val clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        if (clicked) {
+            Log.i(AppConfig.TAG, "auto: pausa del player nativo inviata")
+        } else {
+            Log.w(AppConfig.TAG, "auto: impossibile mettere in pausa il player nativo")
         }
     }
 

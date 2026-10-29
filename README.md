@@ -85,8 +85,10 @@ unità nativa: nessun polling, nessun servizio in background aggiuntivo.
    il file aperto **solo se** esiste davvero una nota nativa in stato `Pausa`
    e la durata reale del file corrisponde a quella della nota in riproduzione.
    Un `OPEN` causato da un download di messaggio in entrata viene ignorato.
-   Il debounce di 300 ms evita di duplicare il percorso quando l'`OPEN` è
-   causato da un click reale.
+   Se l'app sta **già riproducendo** una nota, un `OPEN` non cambia traccia:
+   l'eventuale player nativo viene messo in pausa e il nuovo file parte solo
+   con un click. Il debounce di 300 ms evita di duplicare il percorso quando
+   l'`OPEN` è causato da un click reale.
 
 L'intercettazione dei click resta necessaria: l'`OPEN` dice **quale file**,
 il click dice **cosa vuole l'utente** (stop, switch), copre le note vecchie
@@ -253,6 +255,7 @@ Se un vocale resta muto, il log indica quale fase è fallita:
 | `match … durata=… mtime=…` | fallback per durata (OPEN assente) |
 | `auto-advance …` | WhatsApp è passato da solo alla nota successiva |
 | `auto ignorato: nessuna riproduzione nativa in corso` | `OPEN` da download, non da playback |
+| `auto ignorato: gia' in riproduzione…` | nuova nota in arrivo: la traccia corrente continua |
 | `auto ignorato: file non corrisponde…` | il file aperto non è la nota in riproduzione |
 | `auto: pausa del player nativo inviata` | pausa della nota nativa in auto-advance |
 | `switch vocale: …` | click su un vocale diverso durante il playback |

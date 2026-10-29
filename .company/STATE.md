@@ -6,7 +6,7 @@
 
 ## Dove siamo
 
-v1.2.1 verificata su Pixel 8 (Android 17) con WhatsApp 2.26.41.77 e Desktop Head
+v1.2.2 verificata su Pixel 8 (Android 17) con WhatsApp 2.26.41.77 e Desktop Head
 Unit via ADB: il file vocale viene individuato **per percorso esatto** tramite
 FileObserver, il player nativo viene messo in pausa e il file viene riprodotto
 su `USAGE_MEDIA`. Verificati anche switch immediato tra vocali e auto-advance.
@@ -31,6 +31,9 @@ campo; il Tech Lead ha implementato e calibrato direttamente.
   il player e non genera `OPEN`) usano `match cache`.
 - Click durante il playback: stesso vocale → stop; vocale diverso → switch
   immediato con un solo click.
+- Nessuna interruzione da `OPEN`: se stiamo già riproducendo, un nuovo file
+  aperto da WhatsApp (download o nota in arrivo) viene ignorato e l'eventuale
+  player nativo messo in pausa. Il nuovo vocale parte solo con un click.
 - `WhatsAppUiParser` — tarato sul layout reale: durata nel
   `contentDescription` di `main_layout` (`17 secondi`), orario 12h con U+202F,
   esclusione di `description` (`0:00`), `audio_seekbar`, video e player fuori
@@ -60,6 +63,7 @@ campo; il Tech Lead ha implementato e calibrato direttamente.
 | Auto-advance con player nativo attivo | `auto: pausa del player nativo inviata` + playback del file aperto |
 | Auto-advance mentre il nostro player suona | ferma il precedente e riproduce il nuovo |
 | `OPEN` di un vocale scaricato, senza playback nativo | **ignorato** (nessun audio) |
+| `OPEN` di un nuovo vocale durante il nostro playback | **ignorato**: la traccia corrente continua; pausa nativa |
 | Player nativo durante il nostro playback | tutte le `control_btn` su `Riproduci` |
 | Audio udibile via DHU | **ok, confermato dal CEO** |
 | `./gradlew :app:assembleRelease` + `apksigner verify` | ok: APK release firmato, `minSdk 35`, versione 1.2 |

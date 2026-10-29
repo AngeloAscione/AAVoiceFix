@@ -62,24 +62,46 @@ campo; il Tech Lead ha implementato e calibrato direttamente.
 | Player nativo durante il nostro playback | tutte le `control_btn` su `Riproduci` |
 | Audio udibile in auto | **non provato** (DHU non ha casse) |
 
-## Difetti noti
+## Difetti noti / rischi aperti
 
-Nessuno noto nel flusso verificato. Rischi residui:
+Nessun bug noto nel flusso verificato. Rischi aperti, in ordine di priorità:
 
-1. WhatsApp può cambiare di nuovo label/layout: il fixture e i log
-   (`fumetto vocale non riconosciuto`, `vocale durata=…`) guidano la
-   calibrazione.
-2. Il watcher copre solo le cartelle di oggi/ieri e le 2 più recenti: note
-   molto vecchie usano il fallback (1-2 s di scansione).
-3. Su device lenti la pausa iniettata a 350 ms può arrivare in ritardo.
-4. Il fallback può scegliere un file sbagliato solo se più file hanno la
-   stessa durata e lo stesso orario; il match viene comunque loggato.
-5. L'auto-advance assume che un `OPEN` senza click significhi riproduzione:
-   se WhatsApp aprisse un file solo per preload, partirebbe in anticipo. Nei
-   test osservati l'`OPEN` coincide sempre con il playback.
-6. Con due messaggi dello stesso mittente, stessa durata e stesso minuto, la
-   firma della cache può collidere: il click verrebbe trattato come "stesso
-   vocale". Caso raro; bounds/percorso non entrano nella firma.
+1. **Audio in auto non provato** (DHU non ha casse). È l'unica verifica
+   mancante sul funzionamento reale del prodotto.
+2. **Auto-advance euristico**: un `OPEN` senza click viene trattato come
+   playback. Se WhatsApp aprisse un file per preload, partirebbe in anticipo.
+   Nei test osservati l'`OPEN` coincide sempre con il playback.
+3. **Pausa nativa quando WhatsApp non è in foreground**: `rootInActiveWindow`
+   può non contenere il fumetto; l'auto-advance riprodurrebbe il file senza
+   fermare il player nativo (possibile doppio audio sul telefono).
+4. **Scope del watcher**: solo cartelle di oggi/ieri e le 2 più recenti. Le
+   note più vecchie usano il fallback (1-2 s) e possono essere ambigue.
+5. **Collisione firma cache**: stesso mittente + stessa durata + stesso minuto
+   → un click su un altro vocale verrebbe trattato come "stesso vocale".
+   Caso raro; la firma non include bounds o percorso.
+6. **Cache di fallback**: un match sbagliato per durata resta in cache fino
+   alla disconnessione AA; non c'è un comando per invalidarla.
+7. **Player fuori chat escluso**: il tasto `out_of_chat_playback_btn` non
+   espone durata/orario, quindi non viene intercettato (resta il bug nativo).
+8. **WhatsApp Business** (`com.whatsapp.w4b`) non supportato.
+9. **Localizzazione**: durata in parole riconosciuta in italiano/inglese;
+   altre lingue (`Sekunden`, `segundos`, …) non sono coperte.
+10. **Layout WhatsApp**: fixture e label sono validi per 2.26.41.77; un
+    aggiornamento può richiedere nuova calibrazione.
+11. **SAF**: percorso senza watcher, scansione DocumentFile più lenta; mai
+    provato su device reale.
+12. **Storage secondario / multi-utente** non supportati: solo primary
+    external storage dell'utente corrente.
+13. **Android 10–12** non provati (minSdk 29); test solo su Android 17.
+14. **Pausa nativa a 350 ms**: su device lenti può arrivare tardi; il log
+    dice se il click fallisce.
+15. **Nessun test automatico del servizio**: parser/matcher/watcher/policy
+    sono unit-testati; il flusso click→pause→play è verificato solo a mano.
+16. **Release**: nessuna firma release né R8; decisione CEO ancora aperta.
+17. **Force-stop**: disabilita il servizio di accessibilità (documentato);
+    dopo un force-stop va rilanciato `scripts/adb-setup.sh`.
+18. **Privacy log**: risolto in questa revisione; il log dei click non
+    include più il `contentDescription` dei nodi WhatsApp.
 
 ## Decisioni aperte (spettano al CEO)
 

@@ -117,10 +117,13 @@ class WaFixAccessibilityService : AccessibilityService() {
         }
 
         val source = event.source
+        // Niente contentDescription: nelle righe di chat puo' contenere il
+        // testo del messaggio. Per il vocale i metadati utili sono loggati
+        // dopo il parsing (durata/orario).
         Log.d(
             AppConfig.TAG,
             "click WhatsApp class=${event.className} source=${source != null} " +
-                "id=${source?.viewIdResourceName} desc=${source?.contentDescription}",
+                "id=${source?.viewIdResourceName}",
         )
         if (SystemClock.uptimeMillis() < suppressClicksUntil) {
             Log.d(AppConfig.TAG, "click iniettato ignorato")

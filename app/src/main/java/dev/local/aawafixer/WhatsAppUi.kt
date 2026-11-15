@@ -35,13 +35,13 @@ data class VoiceNoteUi(
 
 object WhatsAppUiParser {
 
-    private val PLAY = Regex("(?i)\\b(play|riproduci|ascolta|reproduci|abspielen|lecture)\\b")
+    private val PLAY = Regex("(?i)\\b(play|riproduci|ascolta|reproduci|abspielen|lecture)\\b|השמע|הפעל")
     // Dopo il click WhatsApp cambia subito la label del controllo in "Pausa":
     // l'evento di accessibilita' arriva quando il nodo e' gia' in questo stato.
-    private val PAUSE = Regex("(?i)\\b(pausa|pause)\\b")
+    private val PAUSE = Regex("(?i)\\b(pausa|pause)\\b|השהי|השהה|עצירה")
     private val VOICE = Regex(
         "(?i)(voice|vocale|nota vocale|nota de voz|mensaje de voz|" +
-            "voice message|voice note|audio message|messaggio audio)",
+            "voice message|voice note|audio message|messaggio audio|הודעה קולית|ההודעה הקולית|קולית)",
     )
     private val VIDEO = Regex("(?i)\\b(video|filmato)\\b")
     private val MMSS = Regex("^\\s*(\\d{1,3}):([0-5]\\d)\\s*$")
@@ -56,12 +56,12 @@ object WhatsAppUiParser {
     // Java non lo copre.
     private const val GAP = "[\\s\\u00A0\\u202F]*"
     private val SPOKEN_SECONDS = Regex(
-        "(?i)(\\d{1,4})$GAP(?:secondi|secondo|seconds?|secs?)\\b",
+        "(?i)(\\d{1,4})$GAP(?:(?:secondi|secondo|seconds?|secs?)\\b|שניות|שנייה|שניה)",
     )
     private val SPOKEN_MINUTES = Regex(
-        "(?i)(\\d{1,3})$GAP(?:minuti|minuto|minutes?|mins?)\\b",
+        "(?i)(\\d{1,3})$GAP(?:(?:minuti|minuto|minutes?|mins?)\\b|דקות|דקה)",
     )
-    private val ELAPSED = Regex("(?i)(trascorso|elapsed|rimanent|remaining|progress)")
+    private val ELAPSED = Regex("(?i)(trascorso|elapsed|rimanent|remaining|progress|שעבר|שנותר)")
     private val CLOCK_12 = Regex("(?i)\\b(\\d{1,2}):([0-5]\\d)$GAP(am|pm)\\b")
     private val CLOCK_24_BARE = Regex("\\b([01]?\\d|2[0-3]):([0-5]\\d)\\b")
 
@@ -191,8 +191,9 @@ object WhatsAppUiParser {
         val speaker = spoken?.source
             ?.substringBefore(", messaggio vocale")
             ?.substringBefore(", voice message")
+            ?.substringBefore(", הודעה קולית")
             ?.trim()
-            ?.trimStart('\u200e')
+            ?.trimStart('\u200e', '\u200f')
             .orEmpty()
         val signature = if (speaker.isNotBlank()) {
             "$speaker|$durationSeconds|$clockMinutes"
